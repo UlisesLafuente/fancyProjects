@@ -55,6 +55,25 @@ class TestPagePercentile(unittest.TestCase):
         self.assertEqual(Page([]).getPercentileCompleted(), 0)
 
 
+class TestPageIsCompleted(unittest.TestCase):
+    def test_page_with_all_tasks_completed(self):
+        task1 = Task("T1", 2)
+        task1.setHoursCompleted(2)
+        task2 = Task("T2", 3)
+        task2.setHoursCompleted(3)
+        self.assertTrue(Page([task1, task2]).isCompleted())
+
+    def test_page_with_pending_task_is_not_completed(self):
+        task1 = Task("T1", 2)
+        task1.setHoursCompleted(2)
+        task2 = Task("T2", 3)
+        task2.setHoursCompleted(1)
+        self.assertFalse(Page([task1, task2]).isCompleted())
+
+    def test_empty_page_is_not_completed(self):
+        self.assertFalse(Page([]).isCompleted())
+
+
 class TestPageTasks(unittest.TestCase):
     def setUp(self):
         self.page = Page([])

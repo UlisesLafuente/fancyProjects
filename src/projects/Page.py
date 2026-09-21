@@ -30,3 +30,8 @@ class Page:
 
     def getTasks(self):
         return self.tasks
+
+    def isCompleted(self):
+        if not self.tasks:
+            return False
+        return all(task.getCompletedTask() for task in self.tasks)

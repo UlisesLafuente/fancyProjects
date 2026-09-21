@@ -110,7 +110,7 @@ class TestProjectView(unittest.TestCase):
         self.view.show_empty()
         self.assertEqual(self.view.get_visible_child_name(), "empty")
 
-    def test_update_project_preserves_expansion(self):
+    def test_refresh_preserves_expansion(self):
         tasks = [Task("Boceto", 2), Task("Tinta", 3)]
         pages = [Page(list(tasks)), Page(list(tasks))]
         project = Project("Comic", pages, workflow_type=WorkflowType.BY_TASK)
@@ -118,17 +118,76 @@ class TestProjectView(unittest.TestCase):
         self.view.show_project(project)
         self.view.page_expanders[1].set_expanded(True)
 
-        self.view.update_project(project)
+        self.view.refresh(project)
         self.assertEqual(len(self.view.page_expanders), 2)
         self.assertFalse(self.view.page_expanders[0].get_expanded())
         self.assertTrue(self.view.page_expanders[1].get_expanded())
+
+    def test_refresh_updates_widgets_in_place(self):
+        task = Task("Boceto", 2)
+        project = Project("Comic", [Page([task])])
+        self.view.show_project(project)
+        row = self.view.task_rows[0][0]
+        hours = self.view.task_hours[0][0]
+
+        task.setHoursCompleted(1)
+        self.view.refresh(project)
+
+        self.assertEqual(row.get_subtitle(), "Pendiente")
+        self.assertEqual(hours.get_text(), "1 / 2 h")
+
+        task.setHoursCompleted(2)
+        self.view.refresh(project)
+        self.assertEqual(row.get_subtitle(), "Completada")
+
+    def test_refresh_page_only_updates_that_page(self):
+        tasks = [Task("Boceto", 2)]
+        project = Project("Comic", [Page(list(tasks)), Page(list(tasks))])
+        self.view.show_project(project)
+
+        project.getPages()[0].getTasks()[0].setHoursCompleted(2)
+        self.view.refresh_page(project, project.getPages()[0])
+
+        self.assertEqual(self.view.task_rows[0][0].get_subtitle(), "Completada")
+        self.assertEqual(self.view.task_rows[1][0].get_subtitle(), "Pendiente")
+        self.assertIsNotNone(self.view.completion_checks[0])
+        self.assertFalse(self.view.completion_checks[1].get_visible())
+
+    def test_refresh_rebuilds_when_structure_changes(self):
+        project = Project("Comic", [Page([Task("Boceto", 2)]), Page([Task("Tinta", 3)])])
+        self.view.show_project(project)
+        project.getPages().pop()
+
+        self.view.refresh(project)
+        self.assertEqual(len(self.view.page_expanders), 1)
+
+    def test_completed_page_shows_check(self):
+        done = Task("Boceto", 2)
+        done.setHoursCompleted(2)
+        pending = Task("Boceto", 2)
+        project = Project("Comic", [Page([done]), Page([pending])])
+
+        self.view.show_project(project)
+        self.assertTrue(self.view.completion_checks[0].get_visible())
+        self.assertFalse(self.view.completion_checks[1].get_visible())
+
+    def test_completion_check_appears_after_refresh(self):
+        task = Task("Boceto", 2)
+        project = Project("Comic", [Page([task])])
+
+        self.view.show_project(project)
+        self.assertFalse(self.view.completion_checks[0].get_visible())
+
+        task.setHoursCompleted(2)
+        self.view.refresh(project)
+        self.assertTrue(self.view.completion_checks[0].get_visible())
 
 
 @unittest.skipUnless(display_available, "No hay display disponible")
 class TestHourGridView(unittest.TestCase):
     def setUp(self):
         self.changes = []
-        self.view = HourGridView(on_change=lambda: self.changes.append(True))
+        self.view = HourGridView(on_change=lambda *_: self.changes.append(True))
         self.window = Gtk.Window()
         self.window.set_child(self.view)
         self.window.present()
@@ -191,6 +250,28 @@ class TestHourGridView(unittest.TestCase):
         self.view.show_project(project)
         self.view.show_empty()
         self.assertEqual(self.view.task_checkboxes, [])
+
+    def test_page_check_hidden_until_completed(self):
+        project = self._make_project(WorkflowType.CONTINUOUS)
+        self.view.show_project(project)
+        self.assertEqual(len(self.view.page_checks), 2)
+        self.assertFalse(self.view.page_checks[0][1].get_visible())
+
+        for task in project.getPages()[0].getTasks():
+            task.setHoursCompleted(task.getHoursPredicted())
+        self.view.refresh_status()
+
+        self.assertTrue(self.view.page_checks[0][1].get_visible())
+        self.assertFalse(self.view.page_checks[1][1].get_visible())
+
+    def test_checking_all_hours_marks_page_completed(self):
+        project = self._make_project(WorkflowType.CONTINUOUS)
+        self.view.show_project(project)
+        for _, checkboxes in self.view.task_checkboxes[:2]:
+            checkboxes[-1].set_active(True)
+        self.view.refresh_status()
+        self.assertTrue(self.view.page_checks[0][1].get_visible())
+        self.assertFalse(self.view.page_checks[1][1].get_visible())
 
 
 @unittest.skipUnless(display_available, "No hay display disponible")

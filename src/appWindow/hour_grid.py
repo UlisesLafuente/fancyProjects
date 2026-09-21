@@ -19,6 +19,7 @@ class HourGridView(Gtk.ScrolledWindow):
         self._color_index = {}
         self.page_boxes = []
         self.task_checkboxes = []
+        self.page_checks = []
 
         self.container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.container.set_margin_top(12)
@@ -40,6 +41,7 @@ class HourGridView(Gtk.ScrolledWindow):
         self._clear()
         self.page_boxes = []
         self.task_checkboxes = []
+        self.page_checks = []
         label = Gtk.Label(label="No hay ningún proyecto abierto")
         label.add_css_class("dim-label")
         label.set_valign(Gtk.Align.CENTER)
@@ -50,6 +52,7 @@ class HourGridView(Gtk.ScrolledWindow):
         self._clear()
         self.page_boxes = []
         self.task_checkboxes = []
+        self.page_checks = []
         self._color_index = self._task_color_indices(project)
 
         self.container.append(self._build_legend())
@@ -85,22 +88,37 @@ class HourGridView(Gtk.ScrolledWindow):
             legend.append(item)
         return legend
 
+    def _completion_check(self, page):
+        check = Gtk.Image.new_from_icon_name("object-select-symbolic")
+        check.add_css_class("success")
+        check.set_tooltip_text("Página completada")
+        check.set_visible(page.isCompleted())
+        self.page_checks.append((page, check))
+        return check
+
+    def refresh_status(self):
+        for page, check in self.page_checks:
+            check.set_visible(page.isCompleted())
+
     def _build_continuous(self, project):
         for page_index, page in enumerate(project.getPages(), start=1):
             page_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             page_box.add_css_class("hour-page")
 
-            header = Gtk.Label(label="Página {}".format(page_index), xalign=0.0)
-            header.add_css_class("heading")
+            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            title = Gtk.Label(label="Página {}".format(page_index), xalign=0.0)
+            title.add_css_class("heading")
+            header.append(title)
+            header.append(self._completion_check(page))
             page_box.append(header)
 
             for task in page.getTasks():
-                page_box.append(self._build_task_box(task))
+                page_box.append(self._build_task_box(task, page))
 
             self.container.append(page_box)
             self.page_boxes.append(page_box)
 
-    def _build_task_box(self, task):
+    def _build_task_box(self, task, page):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.add_css_class("hour-task")
         box.add_css_class("hour-task-{}".format(self._color(task.getTaskName())))
@@ -109,7 +127,7 @@ class HourGridView(Gtk.ScrolledWindow):
         label.add_css_class("caption")
         label.add_css_class("hour-task-label-{}".format(self._color(task.getTaskName())))
         box.append(label)
-        box.append(self._build_hours(task))
+        box.append(self._build_hours(task, page))
         return box
 
     def _build_by_task(self, project):
@@ -132,7 +150,8 @@ class HourGridView(Gtk.ScrolledWindow):
                 page_label.add_css_class("dim-label")
                 page_label.set_width_chars(4)
                 row.append(page_label)
-                row.append(self._build_hours(task))
+                row.append(self._completion_check(page))
+                row.append(self._build_hours(task, page))
                 group.append(row)
 
             self.container.append(group)
@@ -145,7 +164,7 @@ class HourGridView(Gtk.ScrolledWindow):
                 return task
         return None
 
-    def _build_hours(self, task):
+    def _build_hours(self, task, page):
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         row.set_valign(Gtk.Align.CENTER)
 
@@ -154,7 +173,7 @@ class HourGridView(Gtk.ScrolledWindow):
             checkbox = Gtk.CheckButton()
             checkbox.set_active(index < task.getHoursCompleted())
             checkbox.set_tooltip_text("Hora {}".format(index + 1))
-            checkbox.connect("toggled", self._on_hour_toggled, index, checkboxes, task)
+            checkbox.connect("toggled", self._on_hour_toggled, index, checkboxes, task, page)
             checkboxes.append(checkbox)
             row.append(checkbox)
 
@@ -166,7 +185,7 @@ class HourGridView(Gtk.ScrolledWindow):
         self.task_checkboxes.append((task, checkboxes))
         return row
 
-    def _on_hour_toggled(self, checkbox, index, checkboxes, task):
+    def _on_hour_toggled(self, checkbox, index, checkboxes, task, page):
         if self._syncing:
             return
         self._syncing = True
@@ -176,4 +195,4 @@ class HourGridView(Gtk.ScrolledWindow):
         task.setHoursCompleted(target)
         self._syncing = False
         if self.on_change is not None:
-            self.on_change()
+            self.on_change(task, page)

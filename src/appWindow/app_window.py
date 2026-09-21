@@ -5,7 +5,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gdk, Gio, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from persistence.project_repository import ProjectRepository
 from projects.Page import Page
@@ -103,6 +103,9 @@ class ProjectWindow(Adw.ApplicationWindow):
         self.set_default_size(920, 660)
         self.set_title("Gestor de Proyectos")
         self.current_project = None
+        self._refresh_scheduled = False
+        self._pending_pages = set()
+        self._pending_full = False
 
         toolbar = Adw.ToolbarView()
         self.set_content(toolbar)
@@ -203,13 +206,37 @@ class ProjectWindow(Adw.ApplicationWindow):
             self.hour_view.show_project(project)
             self._set_status("Proyecto \"{}\" cargado.".format(project.projectName))
 
-    def _on_hours_changed(self):
+    def _on_hours_changed(self, task=None, page=None):
         if self.current_project is None:
             return
-        self.view.update_project(self.current_project)
+        if page is None:
+            self._pending_full = True
+        else:
+            self._pending_pages.add(page)
+        if self._refresh_scheduled:
+            return
+        self._refresh_scheduled = True
+        GLib.idle_add(self._flush_refresh)
+
+    def _flush_refresh(self):
+        self._refresh_scheduled = False
+        project = self.current_project
+        if project is None:
+            self._pending_pages.clear()
+            self._pending_full = False
+            return False
+        if self._pending_full:
+            self.view.refresh(project)
+        else:
+            for page in self._pending_pages:
+                self.view.refresh_page(project, page)
+        self._pending_pages.clear()
+        self._pending_full = False
+        self.hour_view.refresh_status()
         self._set_status(
-            "Progreso actualizado: {:.0f}% completado.".format(self.current_project.percentComplete())
+            "Progreso actualizado: {:.0f}% completado.".format(project.percentComplete())
         )
+        return False
 
     def _on_save_clicked(self, *args):
         project = self.current_project

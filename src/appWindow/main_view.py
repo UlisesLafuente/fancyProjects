@@ -15,6 +15,8 @@ class ProjectView(Gtk.Stack):
 
         self.page_expanders = []
         self.task_rows = []
+        self.task_hours = []
+        self.completion_checks = []
 
         self.empty_page = self._build_empty_page()
         self.project_page = self._build_project_page()
@@ -75,17 +77,51 @@ class ProjectView(Gtk.Stack):
     def show_empty(self):
         self.set_visible_child_name("empty")
 
-    def update_project(self, project):
-        expanded = [expander.get_expanded() for expander in self.page_expanders]
-        self.show_project(project)
-        for expander, was_expanded in zip(self.page_expanders, expanded):
-            expander.set_expanded(was_expanded)
+    def refresh(self, project):
+        if not self._matches(project):
+            self.show_project(project)
+            return
+        self._update_summary(project)
+        for index, page in enumerate(project.getPages()):
+            self._refresh_page_at(index, page)
 
-    def show_project(self, project):
-        self.set_visible_child_name("project")
+    def refresh_page(self, project, page):
+        if not self._matches(project):
+            self.show_project(project)
+            return
+        try:
+            index = project.getPages().index(page)
+        except ValueError:
+            self.refresh(project)
+            return
+        self._refresh_page_at(index, page)
+        self._update_summary(project)
 
-        self.project_title.set_text(project.projectName)
-        self.workflow_label.set_text(WORKFLOW_LABELS.get(project.workflow_type, project.workflow_type))
+    def _matches(self, project):
+        if self.get_visible_child_name() != "project":
+            return False
+        pages = project.getPages()
+        if len(pages) != len(self.page_expanders):
+            return False
+        for index, page in enumerate(pages):
+            if len(page.getTasks()) != len(self.task_rows[index]):
+                return False
+        return True
+
+    def _refresh_page_at(self, index, page):
+        expander = self.page_expanders[index]
+        expander.set_subtitle(
+            "{:.0f} h estimadas · {:.0f}% completado".format(
+                page.getTotalEstimatedHours(),
+                page.getPercentileCompleted(),
+            )
+        )
+        self.completion_checks[index].set_visible(page.isCompleted())
+        for task, row, hours in zip(page.getTasks(), self.task_rows[index], self.task_hours[index]):
+            row.set_subtitle("Completada" if task.getCompletedTask() else "Pendiente")
+            hours.set_text("{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted()))
+
+    def _update_summary(self, project):
         self.summary_label.set_text(
             "{:.0f} h estimadas · {:.0f} h completadas · {:.0f}% completado".format(
                 project.getTotalEstimatedHours(),
@@ -94,9 +130,18 @@ class ProjectView(Gtk.Stack):
             )
         )
 
+    def show_project(self, project):
+        self.set_visible_child_name("project")
+
+        self.project_title.set_text(project.projectName)
+        self.workflow_label.set_text(WORKFLOW_LABELS.get(project.workflow_type, project.workflow_type))
+        self._update_summary(project)
+
         self.pages_list.remove_all()
         self.page_expanders = []
         self.task_rows = []
+        self.task_hours = []
+        self.completion_checks = []
 
         for page_index, page in enumerate(project.getPages(), start=1):
             expander = Adw.ExpanderRow()
@@ -107,8 +152,15 @@ class ProjectView(Gtk.Stack):
                     page.getPercentileCompleted(),
                 )
             )
+            check = Gtk.Image.new_from_icon_name("object-select-symbolic")
+            check.add_css_class("success")
+            check.set_tooltip_text("Página completada")
+            check.set_visible(page.isCompleted())
+            expander.add_suffix(check)
+            self.completion_checks.append(check)
 
             task_rows = []
+            task_hours = []
             for task in page.getTasks():
                 row = Adw.ActionRow(title=task.getTaskName())
                 row.set_subtitle("Completada" if task.getCompletedTask() else "Pendiente")
@@ -119,7 +171,9 @@ class ProjectView(Gtk.Stack):
                 row.add_suffix(hours)
                 expander.add_row(row)
                 task_rows.append(row)
+                task_hours.append(hours)
 
             self.pages_list.append(expander)
             self.page_expanders.append(expander)
             self.task_rows.append(task_rows)
+            self.task_hours.append(task_hours)
