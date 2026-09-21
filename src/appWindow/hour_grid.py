@@ -1,0 +1,179 @@
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+
+from gi.repository import Gtk
+
+from projects.Project import WorkflowType
+
+COLOR_COUNT = 10
+
+
+class HourGridView(Gtk.ScrolledWindow):
+    def __init__(self, on_change=None):
+        super().__init__()
+        self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.on_change = on_change
+        self._syncing = False
+        self._color_index = {}
+        self.page_boxes = []
+        self.task_checkboxes = []
+
+        self.container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.container.set_margin_top(12)
+        self.container.set_margin_bottom(12)
+        self.container.set_margin_start(12)
+        self.container.set_margin_end(12)
+        self.set_child(self.container)
+
+        self.show_empty()
+
+    def _clear(self):
+        child = self.container.get_first_child()
+        while child is not None:
+            next_child = child.get_next_sibling()
+            self.container.remove(child)
+            child = next_child
+
+    def show_empty(self):
+        self._clear()
+        self.page_boxes = []
+        self.task_checkboxes = []
+        label = Gtk.Label(label="No hay ningún proyecto abierto")
+        label.add_css_class("dim-label")
+        label.set_valign(Gtk.Align.CENTER)
+        label.set_vexpand(True)
+        self.container.append(label)
+
+    def show_project(self, project):
+        self._clear()
+        self.page_boxes = []
+        self.task_checkboxes = []
+        self._color_index = self._task_color_indices(project)
+
+        self.container.append(self._build_legend())
+
+        if project.workflow_type == WorkflowType.BY_TASK:
+            self._build_by_task(project)
+        else:
+            self._build_continuous(project)
+
+    @staticmethod
+    def _task_color_indices(project):
+        indices = {}
+        for page in project.getPages():
+            for task in page.getTasks():
+                if task.getTaskName() not in indices:
+                    indices[task.getTaskName()] = len(indices)
+        return indices
+
+    def _color(self, task_name):
+        return self._color_index.get(task_name, 0) % COLOR_COUNT
+
+    def _build_legend(self):
+        legend = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        legend.add_css_class("hour-legend")
+        for name, index in self._color_index.items():
+            item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            dot = Gtk.Label(label="●")
+            dot.add_css_class("hour-task-label-{}".format(index % COLOR_COUNT))
+            text = Gtk.Label(label=name)
+            text.add_css_class("caption")
+            item.append(dot)
+            item.append(text)
+            legend.append(item)
+        return legend
+
+    def _build_continuous(self, project):
+        for page_index, page in enumerate(project.getPages(), start=1):
+            page_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            page_box.add_css_class("hour-page")
+
+            header = Gtk.Label(label="Página {}".format(page_index), xalign=0.0)
+            header.add_css_class("heading")
+            page_box.append(header)
+
+            for task in page.getTasks():
+                page_box.append(self._build_task_box(task))
+
+            self.container.append(page_box)
+            self.page_boxes.append(page_box)
+
+    def _build_task_box(self, task):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.add_css_class("hour-task")
+        box.add_css_class("hour-task-{}".format(self._color(task.getTaskName())))
+
+        label = Gtk.Label(label=task.getTaskName(), xalign=0.0)
+        label.add_css_class("caption")
+        label.add_css_class("hour-task-label-{}".format(self._color(task.getTaskName())))
+        box.append(label)
+        box.append(self._build_hours(task))
+        return box
+
+    def _build_by_task(self, project):
+        for task_name, index in self._color_index.items():
+            group = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            group.add_css_class("hour-task")
+            group.add_css_class("hour-task-{}".format(index % COLOR_COUNT))
+
+            header = Gtk.Label(label=task_name, xalign=0.0)
+            header.add_css_class("heading")
+            header.add_css_class("hour-task-label-{}".format(index % COLOR_COUNT))
+            group.append(header)
+
+            for page_index, page in enumerate(project.getPages(), start=1):
+                task = self._find_task(page, task_name)
+                if task is None:
+                    continue
+                row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+                page_label = Gtk.Label(label="P{:<3}".format(page_index))
+                page_label.add_css_class("dim-label")
+                page_label.set_width_chars(4)
+                row.append(page_label)
+                row.append(self._build_hours(task))
+                group.append(row)
+
+            self.container.append(group)
+            self.page_boxes.append(group)
+
+    @staticmethod
+    def _find_task(page, task_name):
+        for task in page.getTasks():
+            if task.getTaskName() == task_name:
+                return task
+        return None
+
+    def _build_hours(self, task):
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        row.set_valign(Gtk.Align.CENTER)
+
+        checkboxes = []
+        for index in range(task.getHoursPredicted()):
+            checkbox = Gtk.CheckButton()
+            checkbox.set_active(index < task.getHoursCompleted())
+            checkbox.set_tooltip_text("Hora {}".format(index + 1))
+            checkbox.connect("toggled", self._on_hour_toggled, index, checkboxes, task)
+            checkboxes.append(checkbox)
+            row.append(checkbox)
+
+        if not checkboxes:
+            empty = Gtk.Label(label="Sin horas")
+            empty.add_css_class("dim-label")
+            row.append(empty)
+
+        self.task_checkboxes.append((task, checkboxes))
+        return row
+
+    def _on_hour_toggled(self, checkbox, index, checkboxes, task):
+        if self._syncing:
+            return
+        self._syncing = True
+        target = index + 1 if checkbox.get_active() else index
+        for position, box in enumerate(checkboxes):
+            box.set_active(position < target)
+        task.setHoursCompleted(target)
+        self._syncing = False
+        if self.on_change is not None:
+            self.on_change()

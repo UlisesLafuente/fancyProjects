@@ -75,6 +75,12 @@ class ProjectView(Gtk.Stack):
     def show_empty(self):
         self.set_visible_child_name("empty")
 
+    def update_project(self, project):
+        expanded = [expander.get_expanded() for expander in self.page_expanders]
+        self.show_project(project)
+        for expander, was_expanded in zip(self.page_expanders, expanded):
+            expander.set_expanded(was_expanded)
+
     def show_project(self, project):
         self.set_visible_child_name("project")
 

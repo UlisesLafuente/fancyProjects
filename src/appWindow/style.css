@@ -28,3 +28,42 @@ row:hover {
     border-radius: 999px;
     padding: 2px 10px;
 }
+
+.hour-legend {
+    padding: 4px 2px 8px 2px;
+}
+
+.hour-page {
+    border: 2px solid alpha(currentColor, 0.25);
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.hour-task {
+    border: 2px solid #9a9996;
+    border-radius: 10px;
+    padding: 8px;
+    margin: 4px 0;
+}
+
+.hour-task-0 { border-color: #3584e4; }
+.hour-task-1 { border-color: #33d17a; }
+.hour-task-2 { border-color: #e66100; }
+.hour-task-3 { border-color: #c01c28; }
+.hour-task-4 { border-color: #9141ac; }
+.hour-task-5 { border-color: #e5a50a; }
+.hour-task-6 { border-color: #26a269; }
+.hour-task-7 { border-color: #1c71d8; }
+.hour-task-8 { border-color: #a51d2d; }
+.hour-task-9 { border-color: #986a44; }
+
+.hour-task-label-0 { color: #3584e4; }
+.hour-task-label-1 { color: #33d17a; }
+.hour-task-label-2 { color: #e66100; }
+.hour-task-label-3 { color: #c01c28; }
+.hour-task-label-4 { color: #9141ac; }
+.hour-task-label-5 { color: #e5a50a; }
+.hour-task-label-6 { color: #26a269; }
+.hour-task-label-7 { color: #1c71d8; }
+.hour-task-label-8 { color: #a51d2d; }
+.hour-task-label-9 { color: #986a44; }

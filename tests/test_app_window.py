@@ -15,6 +15,7 @@ from gi.repository import Adw, Gtk
 display_available = Gtk.init_check()
 
 from appWindow.app_window import ProjectApp, ProjectPickerDialog, ProjectWindow, install_stylesheet, STYLE_CSS
+from appWindow.hour_grid import HourGridView
 from appWindow.main_view import ProjectView, WORKFLOW_LABELS
 from appWindow.new_project_dialog import NewProjectDialog
 from persistence.project_repository import ProjectRepository
@@ -109,6 +110,88 @@ class TestProjectView(unittest.TestCase):
         self.view.show_empty()
         self.assertEqual(self.view.get_visible_child_name(), "empty")
 
+    def test_update_project_preserves_expansion(self):
+        tasks = [Task("Boceto", 2), Task("Tinta", 3)]
+        pages = [Page(list(tasks)), Page(list(tasks))]
+        project = Project("Comic", pages, workflow_type=WorkflowType.BY_TASK)
+
+        self.view.show_project(project)
+        self.view.page_expanders[1].set_expanded(True)
+
+        self.view.update_project(project)
+        self.assertEqual(len(self.view.page_expanders), 2)
+        self.assertFalse(self.view.page_expanders[0].get_expanded())
+        self.assertTrue(self.view.page_expanders[1].get_expanded())
+
+
+@unittest.skipUnless(display_available, "No hay display disponible")
+class TestHourGridView(unittest.TestCase):
+    def setUp(self):
+        self.changes = []
+        self.view = HourGridView(on_change=lambda: self.changes.append(True))
+        self.window = Gtk.Window()
+        self.window.set_child(self.view)
+        self.window.present()
+
+    def tearDown(self):
+        self.window.destroy()
+
+    @staticmethod
+    def _make_project(workflow_type):
+        pages = [
+            Page([Task("Boceto", 2), Task("Tinta", 3)]),
+            Page([Task("Boceto", 2), Task("Tinta", 3)]),
+        ]
+        return Project("Comic", pages, workflow_type=workflow_type)
+
+    def test_continuous_creates_page_and_task_boxes(self):
+        project = self._make_project(WorkflowType.CONTINUOUS)
+        self.view.show_project(project)
+        self.assertEqual(len(self.view.page_boxes), 2)
+        self.assertEqual(len(self.view.task_checkboxes), 4)
+        first_task, checkboxes = self.view.task_checkboxes[0]
+        self.assertEqual(first_task.getTaskName(), "Boceto")
+        self.assertEqual(len(checkboxes), 2)
+
+    def test_by_task_groups_one_box_per_task_type(self):
+        project = self._make_project(WorkflowType.BY_TASK)
+        self.view.show_project(project)
+        self.assertEqual(len(self.view.page_boxes), 2)
+        self.assertEqual(len(self.view.task_checkboxes), 4)
+
+    def test_toggling_hour_updates_task(self):
+        project = self._make_project(WorkflowType.CONTINUOUS)
+        self.view.show_project(project)
+        task, checkboxes = self.view.task_checkboxes[0]
+        checkboxes[0].set_active(True)
+        self.assertEqual(task.getHoursCompleted(), 1)
+        self.assertEqual(len(self.changes), 1)
+
+    def test_toggling_fills_previous_hours(self):
+        project = self._make_project(WorkflowType.CONTINUOUS)
+        self.view.show_project(project)
+        task, checkboxes = self.view.task_checkboxes[1]
+        checkboxes[2].set_active(True)
+        self.assertEqual(task.getHoursCompleted(), 3)
+        self.assertTrue(all(box.get_active() for box in checkboxes))
+
+    def test_unchecking_clears_following_hours(self):
+        project = self._make_project(WorkflowType.CONTINUOUS)
+        self.view.show_project(project)
+        task, checkboxes = self.view.task_checkboxes[1]
+        task.setHoursCompleted(3)
+        self.view.show_project(project)
+        task, checkboxes = self.view.task_checkboxes[1]
+        checkboxes[1].set_active(False)
+        self.assertEqual(task.getHoursCompleted(), 1)
+        self.assertFalse(checkboxes[2].get_active())
+
+    def test_show_empty_clears_grid(self):
+        project = self._make_project(WorkflowType.CONTINUOUS)
+        self.view.show_project(project)
+        self.view.show_empty()
+        self.assertEqual(self.view.task_checkboxes, [])
+
 
 @unittest.skipUnless(display_available, "No hay display disponible")
 class TestProjectApp(unittest.TestCase):
@@ -145,6 +228,19 @@ class TestProjectApp(unittest.TestCase):
             [("Boceto", 2), ("Tinta", 3)],
         )
         self.assertEqual(project.getTotalEstimatedHours(), 10)
+        window.destroy()
+
+    def test_window_shows_project_in_both_panes(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic de superheroes",
+            "pages": 2,
+            "tasks": [("Boceto", 2), ("Tinta", 3)],
+            "workflow_type": WorkflowType.BY_TASK,
+        })
+        self.assertIs(window.paned.get_start_child(), window.view)
+        self.assertIs(window.paned.get_end_child(), window.hour_view)
+        self.assertEqual(len(window.hour_view.task_checkboxes), 4)
         window.destroy()
 
     def test_picker_dialog_requires_selection(self):

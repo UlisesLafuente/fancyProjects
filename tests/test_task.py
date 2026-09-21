@@ -59,6 +59,28 @@ class TestTaskUpdateTask(unittest.TestCase):
         self.assertEqual(task.getHoursLeft(), 1)
 
 
+class TestTaskSetHoursCompleted(unittest.TestCase):
+    def test_set_hours_updates_left_and_status(self):
+        task = Task("Entintar", 4)
+        task.setHoursCompleted(2)
+        self.assertEqual(task.getHoursCompleted(), 2)
+        self.assertEqual(task.getHoursLeft(), 2)
+        self.assertFalse(task.getCompletedTask())
+
+    def test_set_all_hours_marks_completed(self):
+        task = Task("Entintar", 4)
+        task.setHoursCompleted(4)
+        self.assertEqual(task.getHoursLeft(), 0)
+        self.assertTrue(task.getCompletedTask())
+
+    def test_set_hours_out_of_range_raises(self):
+        task = Task("Entintar", 4)
+        with self.assertRaises(ValueError):
+            task.setHoursCompleted(5)
+        with self.assertRaises(ValueError):
+            task.setHoursCompleted(-1)
+
+
 class TestTaskStr(unittest.TestCase):
     def test_str_returns_formatted_text(self):
         task = Task("Design", 20)

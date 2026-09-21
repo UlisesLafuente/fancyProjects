@@ -33,6 +33,13 @@ class Task:
         except ValueError as e:
             print(e)
 
+    def setHoursCompleted(self, hoursCompleted: int):
+        if hoursCompleted < 0 or hoursCompleted > self.hoursPredicted:
+            raise ValueError("Hours completed must be between 0 and predicted hours")
+        self.hoursCompleted = hoursCompleted
+        self.hoursLeft = self.hoursPredicted - hoursCompleted
+        self.completedTask = hoursCompleted >= self.hoursPredicted
+
     def getTaskName(self):
         return self.taskName
 

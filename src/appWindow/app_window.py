@@ -12,6 +12,7 @@ from projects.Page import Page
 from projects.Project import Project
 from projects.Task import Task
 
+from appWindow.hour_grid import HourGridView
 from appWindow.main_view import ProjectView
 from appWindow.new_project_dialog import NewProjectDialog
 
@@ -114,7 +115,16 @@ class ProjectWindow(Adw.ApplicationWindow):
         vbox.append(self._build_menu_bar())
 
         self.view = ProjectView()
-        vbox.append(self.view)
+        self.hour_view = HourGridView(on_change=self._on_hours_changed)
+
+        paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        paned.set_wide_handle(True)
+        paned.set_vexpand(True)
+        paned.set_position(460)
+        paned.set_start_child(self.view)
+        paned.set_end_child(self.hour_view)
+        self.paned = paned
+        vbox.append(paned)
 
         self.status_label = Gtk.Label(label="", xalign=0.0)
         self.status_label.set_margin_start(12)
@@ -171,6 +181,7 @@ class ProjectWindow(Adw.ApplicationWindow):
         )
         self.current_project = project
         self.view.show_project(project)
+        self.hour_view.show_project(project)
         self._set_status("Proyecto \"{}\" creado. Usa File ▸ Guardar para persistirlo.".format(project.projectName))
 
     def _on_open_clicked(self, *args):
@@ -189,7 +200,16 @@ class ProjectWindow(Adw.ApplicationWindow):
         if project is not None:
             self.current_project = project
             self.view.show_project(project)
+            self.hour_view.show_project(project)
             self._set_status("Proyecto \"{}\" cargado.".format(project.projectName))
+
+    def _on_hours_changed(self):
+        if self.current_project is None:
+            return
+        self.view.update_project(self.current_project)
+        self._set_status(
+            "Progreso actualizado: {:.0f}% completado.".format(self.current_project.percentComplete())
+        )
 
     def _on_save_clicked(self, *args):
         project = self.current_project
