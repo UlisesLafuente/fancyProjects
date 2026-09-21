@@ -41,7 +41,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="fancyprojects",
+    name="fanzyprojects",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -54,14 +54,14 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="fancyprojects",
+    name="fanzyprojects",
 )
 
 if sys.platform == "darwin":
     app = BUNDLE(
         coll,
-        name="Fancy Projects.app",
-        bundle_identifier="com.ulises.fancyprojects",
+        name="Fanzy Projects.app",
+        bundle_identifier="com.ulises.fanzyprojects",
         icon=str(ROOT / "packaging" / "icon.icns"),
         version=VERSION,
     )

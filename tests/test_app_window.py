@@ -19,6 +19,7 @@ from appWindow.global_view import GlobalView
 from appWindow.hour_grid import HourGridView
 from appWindow.main_view import ProjectView
 from appWindow.new_project_dialog import NewProjectDialog
+from appWindow.project_options_dialog import ProjectOptionsDialog
 from persistence.project_io import export_project, import_project
 from persistence.project_repository import ProjectRepository
 from projects.Page import Page
@@ -70,6 +71,41 @@ class TestNewProjectDialog(unittest.TestCase):
         row = self.dialog.tasks_box.get_first_child()
         self.dialog._on_remove_task(None, "Boceto", row)
         self.assertEqual(self.dialog._tasks, [])
+
+
+@unittest.skipUnless(display_available, "No hay display disponible")
+class TestProjectOptionsDialog(unittest.TestCase):
+    def setUp(self):
+        self.project = Project("Comic", [
+            Page([Task("Boceto", 2), Task("Tinta", 3)]),
+            Page([Task("Boceto", 2), Task("Tinta", 3)]),
+        ])
+        self.dialog = ProjectOptionsDialog(self.project)
+
+    def test_initial_state_matches_project(self):
+        self.assertEqual(self.dialog.spin_pages.get_value(), 2)
+        self.assertEqual(self.dialog._tasks, [("Boceto", 2), ("Tinta", 3)])
+
+    def test_get_data_returns_pages_and_tasks(self):
+        self.dialog.spin_pages.set_value(5)
+        self.dialog.entry_task.set_text("Color")
+        self.dialog.spin_task_hours.set_value(4)
+        self.dialog._on_add_task()
+        self.assertEqual(
+            self.dialog.get_data(),
+            {"pages": 5, "tasks": [("Boceto", 2), ("Tinta", 3), ("Color", 4)]},
+        )
+
+    def test_remove_task(self):
+        row = self.dialog.tasks_box.get_first_child()
+        self.dialog._on_remove_task(None, "Boceto", row)
+        self.assertEqual(self.dialog._tasks, [("Tinta", 3)])
+
+    def test_validation_requires_one_task(self):
+        for name, _ in list(self.dialog._tasks):
+            row = self.dialog.tasks_box.get_first_child()
+            self.dialog._on_remove_task(None, name, row)
+        self.assertFalse(self.dialog._is_valid())
 
 
 @unittest.skipUnless(display_available, "No hay display disponible")
@@ -537,7 +573,7 @@ class TestProjectApp(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.tempdir.name) / "gui_projects.db"
-        app_id = "com.ulises.fancyprojects.test{}".format(id(self))
+        app_id = "com.ulises.fanzyprojects.test{}".format(id(self))
         self.app = ProjectApp(application_id=app_id)
         self.app.register()
 
@@ -566,6 +602,54 @@ class TestProjectApp(unittest.TestCase):
             [("Boceto", 2), ("Tinta", 3)],
         )
         self.assertEqual(project.getTotalEstimatedHours(), 10)
+        window.destroy()
+
+    def test_project_options_add_and_remove_tasks(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 2,
+            "tasks": [("Boceto", 2), ("Tinta", 3)],
+        })
+        window._apply_project_options({
+            "pages": 2,
+            "tasks": [("Boceto", 2), ("Tinta", 3), ("Color", 4)],
+        })
+        project = window.current_project
+        self.assertTrue(window._dirty)
+        self.assertEqual(
+            [(t.getTaskName(), t.getEstimatedHours()) for t in project.getPages()[0].getTasks()],
+            [("Boceto", 2), ("Tinta", 3), ("Color", 4)],
+        )
+        self.assertEqual(
+            [(t.getTaskName(), t.getEstimatedHours()) for t in project.getPages()[1].getTasks()],
+            [("Boceto", 2), ("Tinta", 3), ("Color", 4)],
+        )
+
+        window._apply_project_options({"pages": 2, "tasks": [("Boceto", 5)]})
+        self.assertEqual(
+            [(t.getTaskName(), t.getEstimatedHours()) for t in project.getPages()[1].getTasks()],
+            [("Boceto", 5)],
+        )
+        window.destroy()
+
+    def test_project_options_change_page_count(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 2,
+            "tasks": [("Boceto", 2)],
+        })
+        project = window.current_project
+        project.getPages()[-1].getTasks()[0].setHoursCompleted(2)
+
+        window._apply_project_options({"pages": 4, "tasks": [("Boceto", 2)]})
+        self.assertEqual(len(project.getPages()), 4)
+        self.assertTrue(project.getPages()[1].getTasks()[0].getCompletedTask())
+        self.assertFalse(project.getPages()[2].getTasks()[0].getCompletedTask())
+
+        window._apply_project_options({"pages": 1, "tasks": [("Boceto", 2)]})
+        self.assertEqual(len(project.getPages()), 1)
         window.destroy()
 
     def test_window_shows_three_columns(self):
@@ -717,7 +801,7 @@ class TestImportExportDelete(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.tempdir.name) / "io_projects.db"
-        app_id = "com.ulises.fancyprojects.testio{}".format(id(self))
+        app_id = "com.ulises.fanzyprojects.testio{}".format(id(self))
         self.app = ProjectApp(application_id=app_id)
         self.app.register()
         self.app.repository = ProjectRepository(self.db_path)

@@ -6,6 +6,16 @@ class Page:
     def addTask(self, task):
         self.tasks.append(task)
 
+    def findTask(self, name):
+        for task in self.tasks:
+            if task.getTaskName() == name:
+                return task
+        return None
+
+    def removeTask(self, task):
+        if task in self.tasks:
+            self.tasks.remove(task)
+
     def getTotalEstimatedHours(self):
         totalEstimatedHours = 0
         for task in self.tasks:

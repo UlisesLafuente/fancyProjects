@@ -9,34 +9,34 @@ fi
 VERSION="$("$PY" -c "import sys; sys.path.insert(0, '$ROOT/src'); import src; print(src.__version__)")"
 
 STAGE="$ROOT/dist/deb"
-OUT="$ROOT/dist/fancyprojects_${VERSION}_all.deb"
+OUT="$ROOT/dist/fanzyprojects_${VERSION}_all.deb"
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN" \
          "$STAGE/usr/bin" \
-         "$STAGE/usr/share/fancyprojects" \
+         "$STAGE/usr/share/fanzyprojects" \
          "$STAGE/usr/share/applications" \
          "$STAGE/usr/share/metainfo"
 
 cp "$ROOT/packaging/deb/DEBIAN/control" "$STAGE/DEBIAN/control"
 sed -i "s/^Version: .*/Version: ${VERSION}/" "$STAGE/DEBIAN/control"
 
-cp -r "$ROOT/src" "$STAGE/usr/share/fancyprojects/src"
-cp "$ROOT/packaging/deb/usr/share/fancyprojects/fancyprojects.py" "$STAGE/usr/share/fancyprojects/"
+cp -r "$ROOT/src" "$STAGE/usr/share/fanzyprojects/src"
+cp "$ROOT/packaging/deb/usr/share/fanzyprojects/fanzyprojects.py" "$STAGE/usr/share/fanzyprojects/"
 
-install -m 755 "$ROOT/packaging/deb/usr/bin/fancyprojects" "$STAGE/usr/bin/"
+install -m 755 "$ROOT/packaging/deb/usr/bin/fanzyprojects" "$STAGE/usr/bin/"
 
 for size in 16 32 48 64 128 256 512; do
     mkdir -p "$STAGE/usr/share/icons/hicolor/${size}x${size}/apps"
-    cp "$ROOT/packaging/icons/hicolor/${size}x${size}/apps/com.ulises.fancyprojects.png" \
+    cp "$ROOT/packaging/icons/hicolor/${size}x${size}/apps/com.ulises.fanzyprojects.png" \
        "$STAGE/usr/share/icons/hicolor/${size}x${size}/apps/"
 done
 mkdir -p "$STAGE/usr/share/icons/hicolor/scalable/apps"
-cp "$ROOT/packaging/icons/hicolor/scalable/apps/com.ulises.fancyprojects.svg" \
+cp "$ROOT/packaging/icons/hicolor/scalable/apps/com.ulises.fanzyprojects.svg" \
    "$STAGE/usr/share/icons/hicolor/scalable/apps/"
 
-cp "$ROOT/packaging/com.ulises.fancyprojects.desktop" "$STAGE/usr/share/applications/"
-cp "$ROOT/packaging/com.ulises.fancyprojects.metainfo.xml" "$STAGE/usr/share/metainfo/"
+cp "$ROOT/packaging/com.ulises.fanzyprojects.desktop" "$STAGE/usr/share/applications/"
+cp "$ROOT/packaging/com.ulises.fanzyprojects.metainfo.xml" "$STAGE/usr/share/metainfo/"
 
 dpkg-deb --build --root-owner-group "$STAGE" "$OUT"
 echo "Creado: $OUT"

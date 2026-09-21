@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Fancy Projects
+Name=Fanzy Projects
 GenericName=Gestor de proyectos
 Comment=Gestión de cómics y libros por páginas, tareas y horas
-Exec=/usr/bin/fancyprojects %f
-Icon=com.ulises.fancyprojects
+Exec=/usr/bin/fanzyprojects %f
+Icon=com.ulises.fanzyprojects
 Terminal=false
 Categories=Office;Graphics;
 Keywords=comic;páginas;tareas;proyecto;

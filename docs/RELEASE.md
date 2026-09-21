@@ -46,5 +46,5 @@ en cruz); el flujo recomendado es dejar que CI los genere.
 
 - **Windows**: SmartScreen puede avisar al no haber firma de código comercial.
 - **macOS**: al no estar notarizado, abrir con clic derecho → "Abrir" la primera vez.
-- **Datos**: la base de datos se guarda en `~/.local/share/fancyProjects/projects.db`
-  (se puede sobrescribir con la env var `FANCY_PROJECTS_DB`).
+- **Datos**: la base de datos se guarda en `~/.local/share/fanzyProjects/projects.db`
+  (se puede sobrescribir con la env var `FANZY_PROJECTS_DB`).

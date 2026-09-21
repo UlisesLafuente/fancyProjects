@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(0, "/usr/share/fancyprojects/src")
+sys.path.insert(0, "/usr/share/fanzyprojects/src")
 
 from appWindow.app_window import ProjectApp
 

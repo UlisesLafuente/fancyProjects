@@ -27,7 +27,7 @@ echo "==> Icono .icns"
 ICONSET="build/icon.iconset"
 rm -rf "$ICONSET"
 mkdir -p "$ICONSET"
-SRC="packaging/icons/hicolor/512x512/apps/com.ulises.fancyprojects.png"
+SRC="packaging/icons/hicolor/512x512/apps/com.ulises.fanzyprojects.png"
 for size in 16 32 128 256 512; do
     sips -z "$size" "$size" "$SRC" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
 done
@@ -43,24 +43,24 @@ rm -rf build/pyi_mac dist/Fancy\ Projects.app
 .venv/bin/pyinstaller --noconfirm --clean \
     --distpath "$ROOT/dist" \
     --workpath "$ROOT/build/pyi_mac" \
-    "$ROOT/packaging/fancyprojects.spec"
+    "$ROOT/packaging/fanzyprojects.spec"
 
 echo "==> Firma ad-hoc"
-codesign --force --deep --sign - "dist/Fancy Projects.app"
-codesign --verify --deep "dist/Fancy Projects.app"
+codesign --force --deep --sign - "dist/Fanzy Projects.app"
+codesign --verify --deep "dist/Fanzy Projects.app"
 
 echo "==> Firma binario interno (por si Gatekeeper lo pide)"
-codesign --force --sign - "dist/Fancy Projects.app/Contents/MacOS/fancyprojects"
+codesign --force --sign - "dist/Fanzy Projects.app/Contents/MacOS/fanzyprojects"
 
 echo "==> DMG"
-rm -f "dist/FancyProjects-${VERSION}-macos.dmg"
-hdiutil create -volname "Fancy Projects" -srcfolder "dist/Fancy Projects.app" \
-    -ov -format UDZO "dist/FancyProjects-${VERSION}-macos.dmg"
-ls -lh "dist/FancyProjects-${VERSION}-macos.dmg"
+rm -f "dist/FanzyProjects-${VERSION}-macos.dmg"
+hdiutil create -volname "Fanzy Projects" -srcfolder "dist/Fanzy Projects.app" \
+    -ov -format UDZO "dist/FanzyProjects-${VERSION}-macos.dmg"
+ls -lh "dist/FanzyProjects-${VERSION}-macos.dmg"
 
 echo "==> Smoke test"
-BIN="dist/Fancy Projects.app/Contents/MacOS/fancyprojects"
-LOG="/tmp/fancyprojects-macos-smoke.log"
+BIN="dist/Fanzy Projects.app/Contents/MacOS/fanzyprojects"
+LOG="/tmp/fanzyprojects-macos-smoke.log"
 rm -f "$LOG"
 "$BIN" >"$LOG" 2>&1 &
 PID=$!

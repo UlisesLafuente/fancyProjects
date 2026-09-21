@@ -18,8 +18,9 @@ from appWindow.global_view import GlobalView
 from appWindow.hour_grid import HourGridView
 from appWindow.main_view import ProjectView
 from appWindow.new_project_dialog import NewProjectDialog
+from appWindow.project_options_dialog import ProjectOptionsDialog
 
-APP_ID = "com.ulises.fancyprojects"
+APP_ID = "com.ulises.fanzyprojects"
 APP_ICON_NAME = APP_ID
 
 VIEW_MODE_LABELS = {
@@ -88,9 +89,9 @@ def _swallow_libadwaita_measure_warnings(log_domain, log_level, message):
 
 
 def install_log_filter():
-    if getattr(sys, "_fancyprojects_log_filter", False):
+    if getattr(sys, "_fanzyprojects_log_filter", False):
         return
-    sys._fancyprojects_log_filter = True
+    sys._fanzyprojects_log_filter = True
     GLib.log_set_handler(
         None,
         GLib.LogLevelFlags.LEVEL_MESSAGE
@@ -253,6 +254,7 @@ class ProjectWindow(Adw.ApplicationWindow):
         file_menu.append("Abrir…", "app.open-project")
         file_menu.append("Cerrar proyecto", "app.close-project")
         file_menu.append("Guardar", "app.save-project")
+        file_menu.append("Opciones del proyecto…", "app.project-options")
         file_menu.append("Importar proyecto…", "app.import-project")
         file_menu.append("Exportar proyecto…", "app.export-project")
         file_menu.append("Eliminar proyecto…", "app.delete-project")
@@ -473,10 +475,65 @@ class ProjectWindow(Adw.ApplicationWindow):
         self._dirty = False
         self._set_status("Proyecto \"{}\" guardado.".format(project.projectName))
 
+    def _on_project_options_clicked(self, *args):
+        project = self.current_project
+        if project is None:
+            self._show_info("Opciones del proyecto", "No hay ningún proyecto abierto.")
+            return
+        dialog = ProjectOptionsDialog(project, on_apply=self._apply_project_options)
+        dialog.present(self)
+
+    def _apply_project_options(self, data):
+        project = self.current_project
+        if project is None:
+            return
+        self._apply_task_definitions(project, data["tasks"])
+        self._apply_page_count(project, data["pages"])
+        self._dirty = True
+        self._pending_pages.clear()
+        self._pending_full = False
+        self.view.show_project(project)
+        self.hour_view.show_project(project)
+        self.global_view.show_project(project)
+        self._set_status(
+            "Opciones aplicadas: {} páginas y {} tareas.".format(
+                len(project.getPages()), len(data["tasks"])
+            )
+        )
+
+    @staticmethod
+    def _apply_task_definitions(project, definitions):
+        names = [name for name, _ in definitions]
+        for page in project.getPages():
+            for name, hours in definitions:
+                task = page.findTask(name)
+                if task is None:
+                    page.addTask(Task(name, hours))
+                elif task.getEstimatedHours() != hours:
+                    task.setEstimatedHours(hours)
+            for task in list(page.getTasks()):
+                if task.getTaskName() not in names:
+                    page.removeTask(task)
+
+    @staticmethod
+    def _apply_page_count(project, count):
+        pages = project.getPages()
+        if count > len(pages):
+            template = pages[-1]
+            for _ in range(count - len(pages)):
+                project.addPage(Page([
+                    Task(task.getTaskName(), task.getEstimatedHours())
+                    for task in template.getTasks()
+                ]))
+        elif count < len(pages):
+            for page in pages[count:]:
+                project.removePage(page)
+
     @staticmethod
     def _project_file_filter():
         filterbox = Gtk.FileFilter()
-        filterbox.set_name("Proyectos Fancy Projects (*.fancyproject)")
+        filterbox.set_name("Proyectos Fanzy Projects (*.fanzyproject)")
+        filterbox.add_pattern("*.fanzyproject")
         filterbox.add_pattern("*.fancyproject")
         return filterbox
 
@@ -519,7 +576,7 @@ class ProjectWindow(Adw.ApplicationWindow):
             return
         file_dialog = Gtk.FileDialog()
         file_dialog.set_title("Exportar proyecto")
-        file_dialog.set_initial_name(_safe_filename(project.projectName) + ".fancyproject")
+        file_dialog.set_initial_name(_safe_filename(project.projectName) + ".fanzyproject")
         filters = Gio.ListStore.new(Gtk.FileFilter)
         filters.append(self._project_file_filter())
         file_dialog.set_filters(filters)
@@ -619,6 +676,7 @@ class ProjectApp(Adw.Application):
             "open-project": (self._action_open, ["<Control>o"]),
             "close-project": (self._action_close, None),
             "save-project": (self._action_save, ["<Control>s"]),
+            "project-options": (self._action_project_options, None),
             "import-project": (self._action_import, None),
             "export-project": (self._action_export, None),
             "delete-project": (self._action_delete, None),
@@ -700,6 +758,11 @@ class ProjectApp(Adw.Application):
         window = self.props.active_window
         if window is not None:
             window._on_close_clicked()
+
+    def _action_project_options(self, action, param):
+        window = self.props.active_window
+        if window is not None:
+            window._on_project_options_clicked()
 
     def _action_import(self, action, param):
         window = self.props.active_window

@@ -2,7 +2,8 @@ import os
 import sqlite3
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path.home() / ".local" / "share" / "fancyProjects" / "projects.db"
+DEFAULT_DB_PATH = Path.home() / ".local" / "share" / "fanzyProjects" / "projects.db"
+LEGACY_DB_PATH = Path.home() / ".local" / "share" / "fancyProjects" / "projects.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (
@@ -32,9 +33,11 @@ CREATE TABLE IF NOT EXISTS tasks (
 def resolve_db_path(db_path=None):
     if db_path is not None:
         return Path(db_path)
-    override = os.environ.get("FANCY_PROJECTS_DB")
+    override = os.environ.get("FANZY_PROJECTS_DB") or os.environ.get("FANCY_PROJECTS_DB")
     if override:
         return Path(override)
+    if not DEFAULT_DB_PATH.exists() and LEGACY_DB_PATH.exists():
+        return LEGACY_DB_PATH
     return DEFAULT_DB_PATH
 
 

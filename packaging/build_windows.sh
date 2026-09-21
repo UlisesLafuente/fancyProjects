@@ -21,27 +21,27 @@ pacman -Sy --needed --noconfirm \
 echo "==> PyInstaller"
 python -m pip install --quiet --upgrade pyinstaller
 
-rm -rf build/pyi_win dist/fancyprojects
-SPEC="$(cygpath -m "$ROOT/packaging/fancyprojects.spec")"
+rm -rf build/pyi_win dist/fanzyprojects
+SPEC="$(cygpath -m "$ROOT/packaging/fanzyprojects.spec")"
 python -m PyInstaller --noconfirm --clean "$SPEC"
 
 echo "==> Instalador NSIS"
 sed -e "s/{{VERSION}}/${VERSION}/g" \
     -e "s|{{ROOT}}|$(cygpath -m "$ROOT")|g" \
-    packaging/fancyprojects.nsi > build/fancyprojects.nsi
-makensis build/fancyprojects.nsi
-ls -lh "dist/FancyProjects-${VERSION}-windows-installer.exe"
+    packaging/fanzyprojects.nsi > build/fanzyprojects.nsi
+makensis build/fanzyprojects.nsi
+ls -lh "dist/FanzyProjects-${VERSION}-windows-installer.exe"
 
 echo "==> Smoke test"
-BIN="dist/fancyprojects/fancyprojects.exe"
-LOG="/tmp/fancyprojects-windows-smoke.log"
+BIN="dist/fanzyprojects/fanzyprojects.exe"
+LOG="/tmp/fanzyprojects-windows-smoke.log"
 rm -f "$LOG"
 "$BIN" >"$LOG" 2>&1 &
 PID=$!
 sleep 6
 if kill -0 "$PID" 2>/dev/null; then
     echo "App viva a los 6s -> OK"
-    taskkill //IM fancyprojects.exe //F >/dev/null 2>&1 || kill "$PID"
+    taskkill //IM fanzyprojects.exe //F >/dev/null 2>&1 || kill "$PID"
 elif wait "$PID"; then
     echo "App terminó limpiamente -> OK"
 else

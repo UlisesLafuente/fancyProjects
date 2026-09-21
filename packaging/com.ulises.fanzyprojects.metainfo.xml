@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.ulises.fancyprojects</id>
+  <id>com.ulises.fanzyprojects</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <name>Fancy Projects</name>
+  <name>Fanzy Projects</name>
   <summary>Gestor de cómics y libros por páginas, tareas y horas</summary>
   <description>
     <p>Gestiona proyectos editoriales (cómics, libros) organizándolos en páginas con
     tareas y horas. Permite seguir el progreso hora a hora con distintos workflows
     (continuo o por tareas) y persistir los proyectos en una base de datos local.</p>
   </description>
-  <launchable type="desktop-id">com.ulises.fancyprojects.desktop</launchable>
+  <launchable type="desktop-id">com.ulises.fanzyprojects.desktop</launchable>
   <categories>
     <category>Office</category>
     <category>Graphics</category>

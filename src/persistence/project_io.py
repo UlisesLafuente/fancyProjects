@@ -5,7 +5,8 @@ from projects.Page import Page
 from projects.Project import Project
 from projects.Task import Task
 
-EXPORT_FORMAT = "fancyprojects"
+EXPORT_FORMAT = "fanzyprojects"
+LEGACY_EXPORT_FORMATS = ("fancyprojects",)
 EXPORT_VERSION = 1
 
 
@@ -44,8 +45,8 @@ def _build_task(data):
 
 
 def deserialize_project(data):
-    if not isinstance(data, dict) or data.get("format") != EXPORT_FORMAT:
-        raise ValueError("El archivo no tiene el formato de Fancy Projects.")
+    if not isinstance(data, dict) or data.get("format") not in (EXPORT_FORMAT,) + LEGACY_EXPORT_FORMATS:
+        raise ValueError("El archivo no tiene el formato de Fanzy Projects.")
     if data.get("version") not in (EXPORT_VERSION,):
         raise ValueError(
             "Versión del archivo no soportada: {}.".format(data.get("version"))

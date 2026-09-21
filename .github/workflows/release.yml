@@ -33,9 +33,9 @@ jobs:
         run: packaging/build_deb.sh
       - name: Instalar y smoke test
         run: |
-          sudo dpkg -i dist/fancyprojects_*_all.deb || sudo apt-get -f install -y
+          sudo dpkg -i dist/fanzyprojects_*_all.deb || sudo apt-get -f install -y
           xvfb-run -a bash -c '
-            fancyprojects &
+            fanzyprojects &
             PID=$!
             sleep 5
             if kill -0 "$PID" 2>/dev/null; then
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: deb
-          path: dist/fancyprojects_*_all.deb
+          path: dist/fanzyprojects_*_all.deb
 
   appimage:
     needs: test
@@ -66,7 +66,7 @@ jobs:
       - name: Smoke test
         run: |
           xvfb-run -a bash -c '
-            APPIMAGE_EXTRACT_AND_RUN=1 ./dist/FancyProjects-*.AppImage &
+            APPIMAGE_EXTRACT_AND_RUN=1 ./dist/FanzyProjects-*.AppImage &
             PID=$!
             sleep 6
             if kill -0 "$PID" 2>/dev/null; then
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: appimage
-          path: dist/FancyProjects-*.AppImage
+          path: dist/FanzyProjects-*.AppImage
 
   macos:
     needs: test
@@ -93,7 +93,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos
-          path: dist/FancyProjects-*-macos.dmg
+          path: dist/FanzyProjects-*-macos.dmg
 
   windows:
     needs: test
@@ -120,8 +120,8 @@ jobs:
         with:
           name: windows
           path: |
-            dist/fancyprojects/**
-            dist/FancyProjects-*-windows-installer.exe
+            dist/fanzyprojects/**
+            dist/FanzyProjects-*-windows-installer.exe
 
   release:
     needs: [deb, appimage, macos, windows]
@@ -139,8 +139,8 @@ jobs:
       - name: Crear tarball del código fuente
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          git archive --format=tar.gz -o "fancyprojects-${TAG}.tar.gz" \
-            --prefix="fancyprojects-${TAG}/" HEAD
+          git archive --format=tar.gz -o "fanzyprojects-${TAG}.tar.gz" \
+            --prefix="fanzyprojects-${TAG}/" HEAD
       - name: Preparar changelog del release
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
@@ -162,9 +162,9 @@ jobs:
             artifacts/deb/* \
             artifacts/appimage/* \
             artifacts/macos/* \
-            artifacts/windows/FancyProjects-*-windows-installer.exe \
-            "fancyprojects-${TAG}.tar.gz" \
-            --title "Fancy Projects ${TAG}" \
+            artifacts/windows/FanzyProjects-*-windows-installer.exe \
+            "fanzyprojects-${TAG}.tar.gz" \
+            --title "Fanzy Projects ${TAG}" \
             --generate-notes \
             --notes "$(cat release-notes.md)" \
             --repo "${{ github.repository }}"

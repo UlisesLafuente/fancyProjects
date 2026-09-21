@@ -1,4 +1,3 @@
-import sqlite3
 from contextlib import closing
 
 from persistence.database import connect, init_db

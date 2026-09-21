@@ -15,31 +15,31 @@ APPIMAGE_TOOL="${APPIMAGE_TOOL:-build/appimagetool-x86_64.AppImage}"
 
 .venv/bin/python -m pip install --quiet --upgrade pyinstaller
 
-echo "==> PyInstaller (spec $PWD/packaging/fancyprojects.spec)"
-.venv/bin/pyinstaller --noconfirm --distpath "$ROOT/dist/appimage_dist" "$ROOT/packaging/fancyprojects.spec"
+echo "==> PyInstaller (spec $PWD/packaging/fanzyprojects.spec)"
+.venv/bin/pyinstaller --noconfirm --distpath "$ROOT/dist/appimage_dist" "$ROOT/packaging/fanzyprojects.spec"
 
 echo "==> Ensamblando AppDir"
 APPDIR="build/AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/scalable/apps" "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 
-cp -r dist/appimage_dist/fancyprojects/. "$APPDIR/usr/bin/"
+cp -r dist/appimage_dist/fanzyprojects/. "$APPDIR/usr/bin/"
 
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/bin/sh
-exec "$APPDIR/usr/bin/fancyprojects" "$@"
+exec "$APPDIR/usr/bin/fanzyprojects" "$@"
 EOF
 chmod +x "$APPDIR/AppRun"
 
-cp packaging/com.ulises.fancyprojects.desktop "$APPDIR/usr/share/applications/"
-cp packaging/com.ulises.fancyprojects.metainfo.xml "$APPDIR/usr/share/metainfo/" 2>/dev/null || { mkdir -p "$APPDIR/usr/share/metainfo"; cp packaging/com.ulises.fancyprojects.metainfo.xml "$APPDIR/usr/share/metainfo/"; }
-cp packaging/icons/hicolor/scalable/apps/com.ulises.fancyprojects.svg "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
-cp packaging/icons/hicolor/256x256/apps/com.ulises.fancyprojects.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/"
-cp packaging/icons/hicolor/256x256/apps/com.ulises.fancyprojects.png "$APPDIR/com.ulises.fancyprojects.png"
-cp packaging/com.ulises.fancyprojects.desktop "$APPDIR/com.ulises.fancyprojects.desktop"
+cp packaging/com.ulises.fanzyprojects.desktop "$APPDIR/usr/share/applications/"
+cp packaging/com.ulises.fanzyprojects.metainfo.xml "$APPDIR/usr/share/metainfo/" 2>/dev/null || { mkdir -p "$APPDIR/usr/share/metainfo"; cp packaging/com.ulises.fanzyprojects.metainfo.xml "$APPDIR/usr/share/metainfo/"; }
+cp packaging/icons/hicolor/scalable/apps/com.ulises.fanzyprojects.svg "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
+cp packaging/icons/hicolor/256x256/apps/com.ulises.fanzyprojects.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/"
+cp packaging/icons/hicolor/256x256/apps/com.ulises.fanzyprojects.png "$APPDIR/com.ulises.fanzyprojects.png"
+cp packaging/com.ulises.fanzyprojects.desktop "$APPDIR/com.ulises.fanzyprojects.desktop"
 
 # Icono raíz para appimagetool
-cp packaging/icons/hicolor/scalable/apps/com.ulises.fancyprojects.svg "$APPDIR/com.ulises.fancyprojects.svg"
+cp packaging/icons/hicolor/scalable/apps/com.ulises.fanzyprojects.svg "$APPDIR/com.ulises.fanzyprojects.svg"
 
 if [ ! -x "$APPIMAGE_TOOL" ]; then
     echo "==> Descargando appimagetool"
@@ -50,6 +50,6 @@ if [ ! -x "$APPIMAGE_TOOL" ]; then
 fi
 
 echo "==> Generando AppImage"
-rm -f "dist/FancyProjects-${VERSION}-${ARCH}.AppImage"
-APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$ARCH" "$APPIMAGE_TOOL" "$APPDIR" "dist/FancyProjects-${VERSION}-${ARCH}.AppImage"
-ls -lh "dist/FancyProjects-${VERSION}-${ARCH}.AppImage"
+rm -f "dist/FanzyProjects-${VERSION}-${ARCH}.AppImage"
+APPIMAGE_EXTRACT_AND_RUN=1 ARCH="$ARCH" "$APPIMAGE_TOOL" "$APPDIR" "dist/FanzyProjects-${VERSION}-${ARCH}.AppImage"
+ls -lh "dist/FanzyProjects-${VERSION}-${ARCH}.AppImage"

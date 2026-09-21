@@ -13,6 +13,10 @@ class Project:
     def addPage(self, page):
         self.pages.append(page)
 
+    def removePage(self, page):
+        if page in self.pages:
+            self.pages.remove(page)
+
     def percentComplete(self):
         estimatedHours = self.getTotalEstimatedHours()
         if estimatedHours == 0:
