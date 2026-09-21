@@ -7,7 +7,8 @@ DEFAULT_DB_PATH = Path.home() / ".local" / "share" / "fancyProjects" / "projects
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    workflow_type TEXT NOT NULL DEFAULT 'continuous'
 );
 
 CREATE TABLE IF NOT EXISTS pages (
@@ -49,4 +50,7 @@ def connect(db_path=None):
 
 def init_db(conn):
     conn.executescript(SCHEMA)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(projects)")}
+    if "workflow_type" not in columns:
+        conn.execute("ALTER TABLE projects ADD COLUMN workflow_type TEXT NOT NULL DEFAULT 'continuous'")
     conn.commit()

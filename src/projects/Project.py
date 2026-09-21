@@ -1,8 +1,14 @@
+class WorkflowType:
+    CONTINUOUS = "continuous"
+    BY_TASK = "by_task"
+
+
 class Project:
-    def __init__(self, name, pages, id=None):
+    def __init__(self, name, pages, id=None, workflow_type=WorkflowType.CONTINUOUS):
         self.id = id
         self.projectName = name
         self.pages = pages
+        self.workflow_type = workflow_type
 
     def addPage(self, page):
         self.pages.append(page)

@@ -34,6 +34,21 @@ class ProjectRepositoryTestCase(unittest.TestCase):
 
 
 class TestProjectRepository(ProjectRepositoryTestCase):
+    def test_workflow_type_roundtrip(self):
+        project = Project("Comic", [Page([Task("boceto", 0)])], workflow_type="by_task")
+        self.repository.save_project(project)
+
+        loaded = self.repository.load_project(project.id)
+        self.assertEqual(loaded.workflow_type, "by_task")
+
+    def test_workflow_type_default(self):
+        project = Project("Comic", [])
+        self.repository.save_project(project)
+        self.assertEqual(project.workflow_type, "continuous")
+
+        loaded = self.repository.load_project(project.id)
+        self.assertEqual(loaded.workflow_type, "continuous")
+
     def test_save_and_load_roundtrip(self):
         project = self.build_sample_project()
         self.repository.save_project(project)

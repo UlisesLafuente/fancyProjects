@@ -22,14 +22,14 @@ class ProjectRepository:
             with conn:
                 if project.id is None:
                     cursor = conn.execute(
-                        "INSERT INTO projects (name) VALUES (?)",
-                        (project.projectName,),
+                        "INSERT INTO projects (name, workflow_type) VALUES (?, ?)",
+                        (project.projectName, project.workflow_type),
                     )
                     project.id = cursor.lastrowid
                 else:
                     conn.execute(
-                        "UPDATE projects SET name = ? WHERE id = ?",
-                        (project.projectName, project.id),
+                        "UPDATE projects SET name = ?, workflow_type = ? WHERE id = ?",
+                        (project.projectName, project.workflow_type, project.id),
                     )
 
                 conn.execute("DELETE FROM pages WHERE project_id = ?", (project.id,))
@@ -58,7 +58,7 @@ class ProjectRepository:
     def load_project(self, project_id):
         with closing(self._new_connection()) as conn:
             project_row = conn.execute(
-                "SELECT id, name FROM projects WHERE id = ?",
+                "SELECT id, name, workflow_type FROM projects WHERE id = ?",
                 (project_id,),
             ).fetchone()
             if project_row is None:
@@ -81,14 +81,14 @@ class ProjectRepository:
                 ]
                 pages.append(Page(tasks, id=page["id"]))
 
-            return Project(project_row["name"], pages, id=project_row["id"])
+            return Project(project_row["name"], pages, id=project_row["id"], workflow_type=project_row["workflow_type"])
 
     def list_projects(self):
         with closing(self._new_connection()) as conn:
             rows = conn.execute(
-                "SELECT id, name FROM projects ORDER BY id"
+                "SELECT id, name, workflow_type FROM projects ORDER BY id"
             ).fetchall()
-            return [Project(row["name"], [], id=row["id"]) for row in rows]
+            return [Project(row["name"], [], id=row["id"], workflow_type=row["workflow_type"]) for row in rows]
 
     def delete_project(self, project_id):
         with closing(self._new_connection()) as conn:
