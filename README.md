@@ -56,7 +56,7 @@ Tienes dos opciones:
 - **Windows**: usa *Agregar o quitar programas* del panel de control.
 
 ### Declaración de uso de LLMs
-La aplicación no hace uso de tecnología LLM en ninguno de sus procesos, ni tampoco recibe ni envía datos por red. Sin embargo, en el desarrollo se han utilizado agentes para asistir en el código del interface, no así en la lógica de negocio ni en la programación de la base de datos.
+La aplicación no hace uso de tecnología LLM en ninguno de sus procesos, ni tampoco recibe ni envía datos por red. Sin embargo, en el desarrollo se han utilizado agentes para asistir en el código del interface, no así en la lógica de negocio ni en la programación de la base de datos, y tampoco en la realización del icono de la aplicación ni de ningún tipo de material gráfico.
 
 ## Licencia
 
