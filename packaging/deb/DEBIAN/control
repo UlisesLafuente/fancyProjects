@@ -1,0 +1,12 @@
+Package: fancyprojects
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3, python3-gi, gir1.2-gtk-4.0, libadwaita-1-0, gir1.2-adw-1
+Maintainer: Ulises Lafuente <uliseslafuente@mailfence.com>
+Homepage: https://github.com/uliseslafuente/fancyprojects
+Description: Gestor de proyectos de cómic y libro
+ Gestión de cómics y libros por páginas, tareas y horas, con
+ visualización hora a hora y persistencia local en SQLite.
+ Persiste en ~/.local/share/fancyProjects/projects.db.

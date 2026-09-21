@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import gi
@@ -17,7 +18,15 @@ from appWindow.main_view import ProjectView
 from appWindow.new_project_dialog import NewProjectDialog
 
 APP_ID = "com.ulises.fancyprojects"
-STYLE_CSS = Path(__file__).parent / "style.css"
+
+
+def resource_path(relative: str) -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / relative
+    return Path(__file__).resolve().parent / relative
+
+
+STYLE_CSS = resource_path("style.css")
 
 
 def install_stylesheet():

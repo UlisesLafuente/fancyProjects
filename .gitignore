@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+dist/
+build/
+*.AppImage
+*.deb
+*.dmg
+*.exe
