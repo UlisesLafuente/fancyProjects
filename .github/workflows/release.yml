@@ -141,6 +141,18 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           git archive --format=tar.gz -o "fancyprojects-${TAG}.tar.gz" \
             --prefix="fancyprojects-${TAG}/" HEAD
+      - name: Preparar changelog del release
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "([.]|\\])" { capture = 1 }
+            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" ver "([.]|\\])" { exit }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "Release ${TAG}" > release-notes.md
+          fi
       - name: Publicar release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -152,5 +164,7 @@ jobs:
             artifacts/macos/* \
             artifacts/windows/FancyProjects-*-windows-installer.exe \
             "fancyprojects-${TAG}.tar.gz" \
+            --title "Fancy Projects ${TAG}" \
             --generate-notes \
-            --repo "${{ github.repository }}" || true
+            --notes "$(cat release-notes.md)" \
+            --repo "${{ github.repository }}"

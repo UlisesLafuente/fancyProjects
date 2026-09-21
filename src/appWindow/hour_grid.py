@@ -5,9 +5,9 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Gtk
 
+from appWindow.colors import COLOR_COUNT, task_color_indices
+from appWindow.scrolling import scroll_into_view
 from projects.Project import WorkflowType
-
-COLOR_COUNT = 10
 
 
 class HourGridView(Gtk.ScrolledWindow):
@@ -23,6 +23,7 @@ class HourGridView(Gtk.ScrolledWindow):
         self.task_checkboxes = []
         self.page_checks = []
         self._hours_slots = {}
+        self._page_targets = {}
 
         self.container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.container.set_margin_top(12)
@@ -46,6 +47,7 @@ class HourGridView(Gtk.ScrolledWindow):
         self.task_checkboxes = []
         self.page_checks = []
         self._hours_slots = {}
+        self._page_targets = {}
         self._project = None
         label = Gtk.Label(label="No hay ningún proyecto abierto")
         label.add_css_class("dim-label")
@@ -64,8 +66,9 @@ class HourGridView(Gtk.ScrolledWindow):
         self.task_checkboxes = []
         self.page_checks = []
         self._hours_slots = {}
+        self._page_targets = {}
         self._project = project
-        self._color_index = self._task_color_indices(project)
+        self._color_index = task_color_indices(project)
 
         self.container.append(self._build_legend())
 
@@ -73,15 +76,6 @@ class HourGridView(Gtk.ScrolledWindow):
             self._build_by_task(project)
         else:
             self._build_continuous(project)
-
-    @staticmethod
-    def _task_color_indices(project):
-        indices = {}
-        for page in project.getPages():
-            for task in page.getTasks():
-                if task.getTaskName() not in indices:
-                    indices[task.getTaskName()] = len(indices)
-        return indices
 
     def _color(self, task_name):
         return self._color_index.get(task_name, 0) % COLOR_COUNT
@@ -112,6 +106,9 @@ class HourGridView(Gtk.ScrolledWindow):
         for page, check in self.page_checks:
             check.set_visible(page.isCompleted())
 
+    def scroll_to_page(self, page):
+        scroll_into_view(self, self.container, self._page_targets.get(page))
+
     def _build_continuous(self, project):
         for page_index, page in enumerate(project.getPages(), start=1):
             page_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -131,6 +128,7 @@ class HourGridView(Gtk.ScrolledWindow):
 
             self.container.append(page_box)
             self.page_boxes.append(page_box)
+            self._page_targets[page] = page_box
 
     def _build_task_box(self, task, page):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -169,6 +167,7 @@ class HourGridView(Gtk.ScrolledWindow):
                 row.append(self._build_hours(task, page))
                 group.append(row)
                 self._hours_slots[(task, page)] = (row, check)
+                self._page_targets.setdefault(page, group)
 
             self.container.append(group)
             self.page_boxes.append(group)

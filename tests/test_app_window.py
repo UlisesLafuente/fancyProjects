@@ -15,6 +15,7 @@ from gi.repository import Adw, Gtk, GLib
 display_available = Gtk.init_check()
 
 from appWindow.app_window import ProjectApp, ProjectPickerDialog, ProjectWindow, install_stylesheet, STYLE_CSS, install_app_icon, APP_ICON_NAME, install_log_filter, _swallow_libadwaita_measure_warnings, _safe_filename
+from appWindow.global_view import GlobalView
 from appWindow.hour_grid import HourGridView
 from appWindow.main_view import ProjectView
 from appWindow.new_project_dialog import NewProjectDialog
@@ -224,6 +225,35 @@ class TestProjectView(unittest.TestCase):
         self.assertEqual(stepper.get_hours(), 2)
         self.assertEqual(stepper.entry.get_text(), "2")
 
+    def test_page_fill_uses_last_completed_task_color(self):
+        boceto = Task("Boceto", 2)
+        tinta = Task("Tinta", 3)
+        project = Project("Comic", [Page([boceto, tinta])])
+        self.view.show_project(project)
+        self.assertTrue(self.view.page_expanders[0].has_css_class("page-fill-neutral"))
+
+        boceto.setHoursCompleted(2)
+        self.view.refresh(project)
+        self.assertTrue(self.view.page_expanders[0].has_css_class("page-fill-0"))
+
+        tinta.setHoursCompleted(3)
+        self.view.refresh(project)
+        self.assertTrue(self.view.page_expanders[0].has_css_class("page-fill-1"))
+        self.assertFalse(self.view.page_expanders[0].has_css_class("page-fill-0"))
+
+    def test_page_fill_returns_to_neutral_when_uncompleted(self):
+        task = Task("Boceto", 2)
+        project = Project("Comic", [Page([task])])
+        self.view.show_project(project)
+        task.setHoursCompleted(2)
+        self.view.refresh(project)
+        self.assertTrue(self.view.page_expanders[0].has_css_class("page-fill-0"))
+
+        task.setHoursCompleted(0)
+        self.view.refresh(project)
+        self.assertTrue(self.view.page_expanders[0].has_css_class("page-fill-neutral"))
+        self.assertFalse(self.view.page_expanders[0].has_css_class("page-fill-0"))
+
     def test_plus_increments_estimated_hours(self):
         changes = []
         view = ProjectView(on_estimated_hours_change=lambda t, p: changes.append(t))
@@ -293,6 +323,106 @@ class TestProjectView(unittest.TestCase):
         stepper._on_entry_commit()
         self.assertEqual(task.getHoursPredicted(), 2)
         self.assertEqual(stepper.get_hours(), 2)
+
+
+@unittest.skipUnless(display_available, "No hay display disponible")
+class TestGlobalView(unittest.TestCase):
+    def setUp(self):
+        self.view = GlobalView()
+        self.window = Gtk.Window()
+        self.window.set_child(self.view)
+        self.window.present()
+
+    def tearDown(self):
+        self.window.destroy()
+
+    @staticmethod
+    def _make_project(pages=3):
+        return Project(
+            "Comic",
+            [Page([Task("Boceto", 2), Task("Tinta", 3)]) for _ in range(pages)],
+        )
+
+    @staticmethod
+    def _children(widget):
+        children = []
+        child = widget.get_first_child()
+        while child is not None:
+            children.append(child)
+            child = child.get_next_sibling()
+        return children
+
+    def test_separated_builds_one_rect_per_page(self):
+        project = self._make_project(3)
+        self.view.show_project(project)
+        self.assertEqual(len(self.view.page_widgets), 3)
+
+    def test_spread_groups_first_alone_then_pairs(self):
+        project = self._make_project(5)
+        self.view.set_pages_mode(GlobalView.SPREAD)
+        self.view.show_project(project)
+        self.assertEqual(len(self.view.page_widgets), 5)
+        rows = self._children(self.view.container)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(self._children(rows[0])), 1)
+        self.assertEqual(len(self._children(rows[1])), 2)
+        self.assertEqual(len(self._children(rows[2])), 2)
+
+    def test_spread_odd_last_page_alone(self):
+        project = self._make_project(4)
+        self.view.set_pages_mode(GlobalView.SPREAD)
+        self.view.show_project(project)
+        rows = self._children(self.view.container)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(self._children(rows[0])), 1)
+        self.assertEqual(len(self._children(rows[1])), 2)
+        self.assertEqual(len(self._children(rows[2])), 1)
+
+    def test_color_uses_last_completed_task(self):
+        boceto = Task("Boceto", 2)
+        tinta = Task("Tinta", 3)
+        project = Project("Comic", [Page([boceto, tinta])])
+        self.view.show_project(project)
+        page, _, rect, _ = self.view.page_widgets[0]
+        self.assertTrue(rect.has_css_class("global-page-neutral"))
+
+        boceto.setHoursCompleted(2)
+        self.view.refresh_status()
+        self.assertTrue(rect.has_css_class("global-page-fill-0"))
+
+        tinta.setHoursCompleted(3)
+        self.view.refresh_status()
+        self.assertTrue(rect.has_css_class("global-page-fill-1"))
+        self.assertFalse(rect.has_css_class("global-page-fill-0"))
+
+    def test_caption_shows_page_number_and_percent(self):
+        project = self._make_project(1)
+        self.view.show_project(project)
+        _, page_index, _, caption = self.view.page_widgets[0]
+        self.assertEqual(page_index, 1)
+        self.assertIn("Página 1", caption.get_text())
+        self.assertIn("0 %", caption.get_text())
+
+    def test_show_empty_clears_widgets(self):
+        project = self._make_project(2)
+        self.view.show_project(project)
+        self.view.show_empty()
+        self.assertEqual(self.view.page_widgets, [])
+
+    def test_click_on_page_invokes_callback(self):
+        clicked = []
+        self.view.on_page_click = clicked.append
+        project = self._make_project(2)
+        self.view.show_project(project)
+        self.view._on_page_released(None, 1, 0.0, 0.0, project.getPages()[1])
+        self.assertEqual(clicked, [project.getPages()[1]])
+
+    def test_page_boxes_have_click_controller(self):
+        project = self._make_project(1)
+        self.view.show_project(project)
+        box = self.view.page_boxes[0]
+        controllers = box.observe_controllers()
+        self.assertGreaterEqual(controllers.get_n_items(), 1)
 
 
 @unittest.skipUnless(display_available, "No hay display disponible")
@@ -438,7 +568,7 @@ class TestProjectApp(unittest.TestCase):
         self.assertEqual(project.getTotalEstimatedHours(), 10)
         window.destroy()
 
-    def test_window_shows_project_in_both_panes(self):
+    def test_window_shows_three_columns(self):
         window = ProjectWindow(application=self.app)
         window._create_project({
             "project_name": "Comic de superheroes",
@@ -446,8 +576,104 @@ class TestProjectApp(unittest.TestCase):
             "tasks": [("Boceto", 2), ("Tinta", 3)],
         })
         self.assertIs(window.paned.get_start_child(), window.view)
-        self.assertIs(window.paned.get_end_child(), window.hour_view)
+        self.assertIs(window.paned.get_end_child(), window.right_paned)
+        self.assertIs(window.right_paned.get_start_child(), window.hour_view)
+        self.assertIs(window.right_paned.get_end_child(), window.global_view)
+        self.assertTrue(window.view.get_visible())
+        self.assertTrue(window.hour_view.get_visible())
+        self.assertTrue(window.global_view.get_visible())
         self.assertEqual(len(window.hour_view.task_checkboxes), 4)
+        window.destroy()
+
+    def test_column_toggles_hide_and_show_views(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 1,
+            "tasks": [("Boceto", 2)],
+        })
+        window._set_column_visible("hours", False)
+        self.assertFalse(window.hour_view.get_visible())
+        self.assertTrue(window.global_view.get_visible())
+        window._set_column_visible("hours", True)
+        self.assertTrue(window.hour_view.get_visible())
+        window._set_column_visible("global", False)
+        self.assertFalse(window.global_view.get_visible())
+        window.destroy()
+
+    def test_global_page_click_expands_page_in_project_view(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 3,
+            "tasks": [("Boceto", 2)],
+        })
+        page = window.current_project.getPages()[1]
+        window._on_global_page_clicked(page)
+        self.assertTrue(window.view.page_expanders[1].get_expanded())
+        self.assertFalse(window.view.page_expanders[0].get_expanded())
+        window.destroy()
+
+    def test_pages_mode_toggles_global_view(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 3,
+            "tasks": [("Boceto", 2)],
+        })
+        window._set_pages_mode(GlobalView.SPREAD)
+        self.assertEqual(window.global_view.pages_mode, GlobalView.SPREAD)
+        window._set_pages_mode(GlobalView.SEPARATED)
+        self.assertEqual(window.global_view.pages_mode, GlobalView.SEPARATED)
+        window.destroy()
+
+    def test_headerbar_has_app_icon(self):
+        window = ProjectWindow(application=self.app)
+        self.assertIsInstance(window.app_icon, Gtk.Image)
+        self.assertEqual(window.app_icon.get_pixel_size(), 24)
+        self.assertEqual(window.app_icon.get_icon_name(), APP_ICON_NAME)
+        window.destroy()
+
+    def test_close_request_prompts_only_when_dirty(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 1,
+            "tasks": [("Boceto", 2)],
+        })
+        self.assertFalse(window._on_close_request())
+        window._dirty = True
+        calls = []
+        window._guard_before_discard = lambda proceed: calls.append(proceed)
+        self.assertTrue(window._on_close_request())
+        self.assertEqual(len(calls), 1)
+        window.destroy()
+
+    def test_dirty_flag_and_save_flow(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 1,
+            "tasks": [("Boceto", 2)],
+        })
+        self.assertFalse(window._dirty)
+        window._on_hours_changed(None, None)
+        self.assertTrue(window._dirty)
+        window._on_save_clicked()
+        self.assertFalse(window._dirty)
+        window.destroy()
+
+    def test_guard_runs_immediately_when_clean(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic",
+            "pages": 1,
+            "tasks": [("Boceto", 2)],
+        })
+        ran = []
+        window._guard_before_discard(lambda: ran.append(True))
+        self.assertEqual(ran, [True])
+        self.assertIsNotNone(window.current_project)
         window.destroy()
 
     def test_view_workflow_toggles_hour_view(self):

@@ -5,6 +5,9 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gtk
 
+from appWindow.colors import COLOR_COUNT, task_color_indices, most_advanced_completed_task
+from appWindow.scrolling import scroll_into_view
+
 
 def _task_subtitle(task):
     state = "Completada" if task.getCompletedTask() else "Pendiente"
@@ -89,6 +92,7 @@ class ProjectView(Gtk.Stack):
         super().__init__()
         self.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.on_estimated_hours_change = on_estimated_hours_change
+        self._color_index = {}
 
         self.page_expanders = []
         self.task_rows = []
@@ -113,7 +117,7 @@ class ProjectView(Gtk.Stack):
         title = Gtk.Label(label="No hay ningún proyecto abierto")
         title.add_css_class("dim-label")
 
-        hint = Gtk.Label(label="Usa File ▸ Nuevo proyecto para crear uno,\no File ▸ Abrir para cargar uno guardado.")
+        hint = Gtk.Label(label="Usa Archivo ▸ Nuevo proyecto para crear uno,\no Archivo ▸ Abrir para cargar uno guardado.")
         hint.add_css_class("dim-label")
 
         box.append(icon)
@@ -145,6 +149,7 @@ class ProjectView(Gtk.Stack):
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_vexpand(True)
         scrolled.set_child(self.pages_list)
+        self.pages_scrolled = scrolled
         page.append(scrolled)
         return page
 
@@ -171,6 +176,17 @@ class ProjectView(Gtk.Stack):
         self._refresh_page_at(index, page)
         self._update_summary(project)
 
+    def scroll_to_page(self, project, page):
+        try:
+            index = project.getPages().index(page)
+        except ValueError:
+            return
+        if index >= len(self.page_expanders):
+            return
+        expander = self.page_expanders[index]
+        expander.set_expanded(True)
+        scroll_into_view(self.pages_scrolled, self.pages_list, expander)
+
     def _matches(self, project):
         if self.get_visible_child_name() != "project":
             return False
@@ -192,6 +208,7 @@ class ProjectView(Gtk.Stack):
         )
         self.completion_checks[index].set_visible(page.isCompleted())
         self._set_completed(expander, page.isCompleted(), "page-completed")
+        self._set_page_fill(expander, page)
         for task, row, stepper in zip(page.getTasks(), self.task_rows[index], self.task_steppers[index]):
             row.set_subtitle(_task_subtitle(task))
             self._set_completed(row, task.getCompletedTask(), "task-completed")
@@ -208,6 +225,17 @@ class ProjectView(Gtk.Stack):
             widget.add_css_class(css_class)
         else:
             widget.remove_css_class(css_class)
+
+    def _set_page_fill(self, expander, page):
+        for css_class in list(expander.get_css_classes()):
+            if css_class == "page-fill-neutral" or css_class.startswith("page-fill-"):
+                expander.remove_css_class(css_class)
+        task = most_advanced_completed_task(page.getTasks())
+        if task is None:
+            expander.add_css_class("page-fill-neutral")
+        else:
+            index = self._color_index.get(task.getTaskName(), 0) % COLOR_COUNT
+            expander.add_css_class("page-fill-{}".format(index))
 
     def _update_summary(self, project):
         self.summary_label.set_text(
@@ -229,6 +257,7 @@ class ProjectView(Gtk.Stack):
         self.task_rows = []
         self.task_steppers = []
         self.completion_checks = []
+        self._color_index = task_color_indices(project)
 
         for page_index, page in enumerate(project.getPages(), start=1):
             expander = Adw.ExpanderRow()
@@ -246,6 +275,7 @@ class ProjectView(Gtk.Stack):
             expander.add_suffix(check)
             self.completion_checks.append(check)
             self._set_completed(expander, page.isCompleted(), "page-completed")
+            self._set_page_fill(expander, page)
 
             task_rows = []
             task_steppers = []
