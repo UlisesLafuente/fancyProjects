@@ -8,6 +8,7 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
+from persistence.project_io import export_project, import_project
 from persistence.project_repository import ProjectRepository
 from projects.Page import Page
 from projects.Project import Project
@@ -29,6 +30,11 @@ def resource_path(relative: str) -> Path:
 STYLE_CSS = resource_path("style.css")
 
 
+def _safe_filename(name):
+    cleaned = "".join(c if c not in "/\\:" else "-" for c in name)
+    return cleaned.strip() or "proyecto"
+
+
 def install_stylesheet():
     if not STYLE_CSS.exists():
         return
@@ -42,9 +48,9 @@ def install_stylesheet():
 
 
 class ProjectPickerDialog(Adw.Dialog):
-    def __init__(self, projects, on_open=None):
+    def __init__(self, projects, on_open=None, title="Abrir proyecto", confirm_label="Abrir"):
         super().__init__()
-        self.set_title("Abrir proyecto")
+        self.set_title(title)
         self.set_size_request(480, -1)
         self._on_open = on_open
         self._selected = None
@@ -81,7 +87,7 @@ class ProjectPickerDialog(Adw.Dialog):
         action_box.set_halign(Gtk.Align.END)
         cancel_btn = Gtk.Button(label="Cancelar")
         cancel_btn.connect("clicked", lambda *_: self.close())
-        open_btn = Gtk.Button(label="Abrir")
+        open_btn = Gtk.Button(label=confirm_label)
         open_btn.add_css_class("suggested-action")
         open_btn.connect("clicked", lambda *_: self._choose())
         action_box.append(cancel_btn)
@@ -171,6 +177,9 @@ class ProjectWindow(Adw.ApplicationWindow):
         file_menu.append("Nuevo proyecto…", "app.new-project")
         file_menu.append("Abrir…", "app.open-project")
         file_menu.append("Guardar", "app.save-project")
+        file_menu.append("Importar proyecto…", "app.import-project")
+        file_menu.append("Exportar proyecto…", "app.export-project")
+        file_menu.append("Eliminar proyecto…", "app.delete-project")
         file_menu.append("Salir", "app.quit")
         root.append_submenu("File", file_menu)
         return Gtk.PopoverMenuBar.new_from_model(root)
@@ -255,6 +264,111 @@ class ProjectWindow(Adw.ApplicationWindow):
         self.app.repository.save_project(project)
         self._set_status("Proyecto \"{}\" guardado.".format(project.projectName))
 
+    @staticmethod
+    def _project_file_filter():
+        filterbox = Gtk.FileFilter()
+        filterbox.set_name("Proyectos Fancy Projects (*.fancyproject)")
+        filterbox.add_pattern("*.fancyproject")
+        return filterbox
+
+    def _on_import_clicked(self, *args):
+        file_dialog = Gtk.FileDialog()
+        file_dialog.set_title("Importar proyecto")
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(self._project_file_filter())
+        file_dialog.set_filters(filters)
+        file_dialog.open(self, None, self._on_import_dialog_response)
+
+    def _on_import_dialog_response(self, file_dialog, result):
+        try:
+            file = file_dialog.open_finish(result)
+        except GLib.Error:
+            return
+        self._import_file(file.get_path())
+
+    def _import_file(self, path):
+        try:
+            project = import_project(path)
+        except (ValueError, OSError) as e:
+            self._show_info("Importar proyecto", "No se pudo importar el proyecto:\n{}".format(e))
+            return
+        self.app.repository.save_project(project)
+        self.current_project = project
+        self.view.show_project(project)
+        self.hour_view.show_project(project)
+        self._set_status("Proyecto \"{}\" importado.".format(project.projectName))
+
+    def _on_export_clicked(self, *args):
+        project = self.current_project
+        if project is None:
+            self._show_info("Exportar proyecto", "No hay ningún proyecto abierto para exportar.")
+            return
+        file_dialog = Gtk.FileDialog()
+        file_dialog.set_title("Exportar proyecto")
+        file_dialog.set_initial_name(_safe_filename(project.projectName) + ".fancyproject")
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(self._project_file_filter())
+        file_dialog.set_filters(filters)
+        file_dialog.save(self, None, self._on_export_dialog_response)
+
+    def _on_export_dialog_response(self, file_dialog, result):
+        try:
+            file = file_dialog.save_finish(result)
+        except GLib.Error:
+            return
+        self._export_to(file.get_path())
+
+    def _export_to(self, path):
+        project = self.current_project
+        if project is None:
+            return
+        try:
+            export_project(project, path)
+        except OSError as e:
+            self._show_info("Exportar proyecto", "No se pudo exportar el proyecto:\n{}".format(e))
+            return
+        self._set_status("Proyecto \"{}\" exportado a {}.".format(project.projectName, path))
+
+    def _on_delete_clicked(self, *args):
+        projects = self.app.repository.list_projects()
+        if not projects:
+            self._show_info("Eliminar proyecto", "No hay proyectos guardados para eliminar.")
+            return
+        dialog = ProjectPickerDialog(
+            projects,
+            on_open=self._confirm_delete,
+            title="Eliminar proyecto",
+            confirm_label="Eliminar",
+        )
+        dialog.present(self)
+
+    def _confirm_delete(self, project_id):
+        project = self.app.repository.load_project(project_id)
+        name = project.projectName if project is not None else str(project_id)
+        dialog = Adw.MessageDialog.new(
+            self,
+            "Eliminar proyecto",
+            "Se eliminará \"{}\" permanentemente.\nEsta acción no se puede deshacer.".format(name),
+        )
+        dialog.add_response("cancel", "Cancelar")
+        dialog.add_response("delete", "Eliminar")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.connect("response", self._on_delete_confirmed, project_id)
+        dialog.present()
+
+    def _on_delete_confirmed(self, dialog, response, project_id):
+        if dialog is not None:
+            dialog.close()
+        if response != "delete":
+            return
+        self.app.repository.delete_project(project_id)
+        if self.current_project is not None and self.current_project.id == project_id:
+            self.current_project = None
+            self.view.show_empty()
+            self.hour_view.show_empty()
+        self._set_status("Proyecto eliminado.")
+
     def _show_info(self, title, message):
         dialog = Adw.MessageDialog.new(self, title, message)
         dialog.add_response("ok", "OK")
@@ -285,12 +399,16 @@ class ProjectApp(Adw.Application):
             "new-project": (self._action_new, ["<Control>n"]),
             "open-project": (self._action_open, ["<Control>o"]),
             "save-project": (self._action_save, ["<Control>s"]),
+            "import-project": (self._action_import, None),
+            "export-project": (self._action_export, None),
+            "delete-project": (self._action_delete, None),
         }
         for name, (handler, accels) in handlers.items():
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", handler)
             self.add_action(action)
-            self.set_accels_for_action("app." + name, accels)
+            if accels is not None:
+                self.set_accels_for_action("app." + name, accels)
         self.set_accels_for_action("app.quit", ["<Control>q"])
 
     def _action_new(self, action, param):
@@ -307,3 +425,18 @@ class ProjectApp(Adw.Application):
         window = self.props.active_window
         if window is not None:
             window._on_save_clicked()
+
+    def _action_import(self, action, param):
+        window = self.props.active_window
+        if window is not None:
+            window._on_import_clicked()
+
+    def _action_export(self, action, param):
+        window = self.props.active_window
+        if window is not None:
+            window._on_export_clicked()
+
+    def _action_delete(self, action, param):
+        window = self.props.active_window
+        if window is not None:
+            window._on_delete_clicked()

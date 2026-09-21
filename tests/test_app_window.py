@@ -14,10 +14,11 @@ from gi.repository import Adw, Gtk
 
 display_available = Gtk.init_check()
 
-from appWindow.app_window import ProjectApp, ProjectPickerDialog, ProjectWindow, install_stylesheet, STYLE_CSS
+from appWindow.app_window import ProjectApp, ProjectPickerDialog, ProjectWindow, install_stylesheet, STYLE_CSS, _safe_filename
 from appWindow.hour_grid import HourGridView
 from appWindow.main_view import ProjectView, WORKFLOW_LABELS
 from appWindow.new_project_dialog import NewProjectDialog
+from persistence.project_io import export_project, import_project
 from persistence.project_repository import ProjectRepository
 from projects.Page import Page
 from projects.Project import Project, WorkflowType
@@ -338,6 +339,82 @@ class TestProjectApp(unittest.TestCase):
         dialog._choose()
         self.assertEqual(dialog.get_selected_id(), projects[1].id)
         dialog.close()
+
+    def test_safe_filename_sanitizes(self):
+        self.assertEqual(_safe_filename("Comic de heroes"), "Comic de heroes")
+        self.assertEqual(_safe_filename("A/B:C\\D"), "A-B-C-D")
+        self.assertEqual(_safe_filename("   "), "proyecto")
+
+
+@unittest.skipUnless(display_available, "No hay display disponible")
+class TestImportExportDelete(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tempdir.name) / "io_projects.db"
+        app_id = "com.ulises.fancyprojects.testio{}".format(id(self))
+        self.app = ProjectApp(application_id=app_id)
+        self.app.register()
+        self.app.repository = ProjectRepository(self.db_path)
+        self.window = ProjectWindow(application=self.app)
+
+    def tearDown(self):
+        self.window.destroy()
+        self.app.quit()
+        self.tempdir.cleanup()
+
+    def _open_saved_project(self):
+        project = Project("Comic", [Page([Task("Boceto", 2), Task("Tinta", 3)])])
+        self.app.repository.save_project(project)
+        self.window._open_project(project.id)
+        return project
+
+    def test_import_file_creates_and_opens_project(self):
+        path = Path(self.tempdir.name) / "comic.fancyproject"
+        export_project(Project("Comic", [Page([Task("Boceto", 2)])]), path)
+
+        self.window._import_file(path)
+
+        project = self.window.current_project
+        self.assertIsNotNone(project)
+        self.assertEqual(project.projectName, "Comic")
+        self.assertIsNotNone(project.id)
+        self.assertEqual(self.window.view.get_visible_child_name(), "project")
+        self.assertEqual(len(self.window.hour_view.task_checkboxes), 1)
+        self.assertEqual(len(self.app.repository.list_projects()), 1)
+
+    def test_import_file_invalid_reports_error_without_changes(self):
+        path = Path(self.tempdir.name) / "malo.fancyproject"
+        path.write_text("no json", encoding="utf-8")
+        self.window._import_file(path)
+        self.assertIsNone(self.window.current_project)
+        self.assertEqual(self.app.repository.list_projects(), [])
+
+    def test_export_to_writes_isolated_file(self):
+        self._open_saved_project()
+        path = Path(self.tempdir.name) / "copia.fancyproject"
+
+        self.window._export_to(path)
+
+        restored = import_project(path)
+        self.assertEqual(restored.projectName, "Comic")
+        self.assertEqual(restored.getTotalEstimatedHours(), 5)
+        self.assertIn("copia.fancyproject", self.window.status_label.get_text())
+
+    def test_delete_confirmed_removes_project(self):
+        project = self._open_saved_project()
+        self.assertEqual(len(self.app.repository.list_projects()), 1)
+
+        self.window._on_delete_confirmed(None, "delete", project.id)
+
+        self.assertEqual(self.app.repository.list_projects(), [])
+        self.assertIsNone(self.window.current_project)
+        self.assertEqual(self.window.view.get_visible_child_name(), "empty")
+
+    def test_delete_cancelled_keeps_project(self):
+        project = self._open_saved_project()
+        self.window._on_delete_confirmed(None, "cancel", project.id)
+        self.assertEqual(len(self.app.repository.list_projects()), 1)
+        self.assertIsNotNone(self.window.current_project)
 
 
 @unittest.skipUnless(display_available, "No hay display disponible")
