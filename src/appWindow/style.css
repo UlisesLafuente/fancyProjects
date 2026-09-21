@@ -29,6 +29,16 @@ row:hover {
     padding: 2px 10px;
 }
 
+.task-completed,
+.page-completed {
+    background-color: alpha(@success_color, 0.22);
+}
+
+.task-completed:hover,
+.page-completed:hover {
+    background-color: alpha(@success_color, 0.30);
+}
+
 .hour-legend {
     padding: 4px 2px 8px 2px;
 }

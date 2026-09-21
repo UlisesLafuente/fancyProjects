@@ -10,7 +10,10 @@ a = Analysis(
     [str(ROOT / "packaging" / "main.py")],
     pathex=[str(ROOT / "src")],
     binaries=[],
-    datas=[(str(ROOT / "src" / "appWindow" / "style.css"), ".")],
+    datas=[
+        (str(ROOT / "src" / "appWindow" / "style.css"), "."),
+        (str(ROOT / "src" / "res"), "res"),
+    ],
     hiddenimports=["gi", "appWindow", "appWindow.hour_grid", "persistence", "projects"],
     hookspath=[],
     hooksconfig={

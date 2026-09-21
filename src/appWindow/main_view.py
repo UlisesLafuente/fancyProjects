@@ -117,9 +117,18 @@ class ProjectView(Gtk.Stack):
             )
         )
         self.completion_checks[index].set_visible(page.isCompleted())
+        self._set_completed(expander, page.isCompleted(), "page-completed")
         for task, row, hours in zip(page.getTasks(), self.task_rows[index], self.task_hours[index]):
             row.set_subtitle("Completada" if task.getCompletedTask() else "Pendiente")
+            self._set_completed(row, task.getCompletedTask(), "task-completed")
             hours.set_text("{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted()))
+
+    @staticmethod
+    def _set_completed(widget, completed, css_class):
+        if completed:
+            widget.add_css_class(css_class)
+        else:
+            widget.remove_css_class(css_class)
 
     def _update_summary(self, project):
         self.summary_label.set_text(
@@ -158,12 +167,14 @@ class ProjectView(Gtk.Stack):
             check.set_visible(page.isCompleted())
             expander.add_suffix(check)
             self.completion_checks.append(check)
+            self._set_completed(expander, page.isCompleted(), "page-completed")
 
             task_rows = []
             task_hours = []
             for task in page.getTasks():
                 row = Adw.ActionRow(title=task.getTaskName())
                 row.set_subtitle("Completada" if task.getCompletedTask() else "Pendiente")
+                self._set_completed(row, task.getCompletedTask(), "task-completed")
                 hours = Gtk.Label(
                     label="{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted())
                 )

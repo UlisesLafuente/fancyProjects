@@ -19,12 +19,19 @@ from appWindow.main_view import ProjectView
 from appWindow.new_project_dialog import NewProjectDialog
 
 APP_ID = "com.ulises.fancyprojects"
+APP_ICON_NAME = APP_ID
 
 
 def resource_path(relative: str) -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS) / relative
     return Path(__file__).resolve().parent / relative
+
+
+def get_res_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "res"
+    return Path(__file__).resolve().parent.parent / "res"
 
 
 STYLE_CSS = resource_path("style.css")
@@ -45,6 +52,35 @@ def install_stylesheet():
         Gtk.StyleContext.add_provider_for_display(
             display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
+
+
+def install_app_icon():
+    res_dir = get_res_dir()
+    if not (res_dir / (APP_ICON_NAME + ".svg")).exists():
+        return
+    display = Gdk.Display.get_default()
+    if display is not None:
+        Gtk.IconTheme.get_for_display(display).add_search_path(str(res_dir))
+    Gtk.Window.set_default_icon_name(APP_ICON_NAME)
+
+
+def _swallow_libadwaita_measure_warnings(log_domain, log_level, message):
+    if message is not None and "natural size must be >= min size" in message:
+        return
+    GLib.log_default_handler(log_domain, log_level, message)
+
+
+def install_log_filter():
+    if getattr(sys, "_fancyprojects_log_filter", False):
+        return
+    sys._fancyprojects_log_filter = True
+    GLib.log_set_handler(
+        None,
+        GLib.LogLevelFlags.LEVEL_MESSAGE
+        | GLib.LogLevelFlags.LEVEL_WARNING
+        | GLib.LogLevelFlags.LEVEL_CRITICAL,
+        _swallow_libadwaita_measure_warnings,
+    )
 
 
 class ProjectPickerDialog(Adw.Dialog):
@@ -397,10 +433,12 @@ class ProjectApp(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        install_log_filter()
         self._create_actions()
 
     def do_activate(self):
         install_stylesheet()
+        install_app_icon()
         window = self.props.active_window
         if not window:
             window = ProjectWindow(application=self)

@@ -10,11 +10,11 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gtk, GLib
 
 display_available = Gtk.init_check()
 
-from appWindow.app_window import ProjectApp, ProjectPickerDialog, ProjectWindow, install_stylesheet, STYLE_CSS, _safe_filename
+from appWindow.app_window import ProjectApp, ProjectPickerDialog, ProjectWindow, install_stylesheet, STYLE_CSS, install_app_icon, APP_ICON_NAME, install_log_filter, _swallow_libadwaita_measure_warnings, _safe_filename
 from appWindow.hour_grid import HourGridView
 from appWindow.main_view import ProjectView, WORKFLOW_LABELS
 from appWindow.new_project_dialog import NewProjectDialog
@@ -182,6 +182,44 @@ class TestProjectView(unittest.TestCase):
         task.setHoursCompleted(2)
         self.view.refresh(project)
         self.assertTrue(self.view.completion_checks[0].get_visible())
+
+    def test_completed_page_gets_green_background(self):
+        done = Task("Boceto", 2)
+        done.setHoursCompleted(2)
+        pending = Task("Boceto", 2)
+        project = Project("Comic", [Page([done]), Page([pending])])
+
+        self.view.show_project(project)
+        self.assertTrue(self.view.page_expanders[0].has_css_class("page-completed"))
+        self.assertFalse(self.view.page_expanders[1].has_css_class("page-completed"))
+
+    def test_completed_task_gets_green_background(self):
+        done = Task("Boceto", 2)
+        done.setHoursCompleted(2)
+        pending = Task("Tinta", 3)
+        project = Project("Comic", [Page([done, pending])])
+
+        self.view.show_project(project)
+        self.assertTrue(self.view.task_rows[0][0].has_css_class("task-completed"))
+        self.assertFalse(self.view.task_rows[0][1].has_css_class("task-completed"))
+
+    def test_refresh_toggles_green_background(self):
+        task = Task("Boceto", 2)
+        project = Project("Comic", [Page([task])])
+
+        self.view.show_project(project)
+        self.assertFalse(self.view.task_rows[0][0].has_css_class("task-completed"))
+        self.assertFalse(self.view.page_expanders[0].has_css_class("page-completed"))
+
+        task.setHoursCompleted(2)
+        self.view.refresh(project)
+        self.assertTrue(self.view.task_rows[0][0].has_css_class("task-completed"))
+        self.assertTrue(self.view.page_expanders[0].has_css_class("page-completed"))
+
+        task.setHoursCompleted(0)
+        self.view.refresh(project)
+        self.assertFalse(self.view.task_rows[0][0].has_css_class("task-completed"))
+        self.assertFalse(self.view.page_expanders[0].has_css_class("page-completed"))
 
 
 @unittest.skipUnless(display_available, "No hay display disponible")
@@ -440,6 +478,62 @@ class TestStylesheet(unittest.TestCase):
         install_stylesheet()
         provider = Gtk.CssProvider()
         provider.load_from_path(str(STYLE_CSS))
+
+
+@unittest.skipUnless(display_available, "No hay display disponible")
+class TestAppIcon(unittest.TestCase):
+    def test_res_icon_exists(self):
+        from appWindow.app_window import get_res_dir
+
+        icon = get_res_dir() / (APP_ICON_NAME + ".svg")
+        self.assertTrue(icon.is_file())
+
+    def test_install_app_icon_registers_name(self):
+        install_app_icon()
+        self.assertEqual(Gtk.Window.get_default_icon_name(), APP_ICON_NAME)
+
+    def test_icon_resolves_in_theme(self):
+        from gi.repository import Gdk
+
+        install_app_icon()
+        theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        icon = theme.lookup_icon(APP_ICON_NAME, None, 48, 1, Gtk.TextDirection.LTR, 0)
+        self.assertIsNotNone(icon)
+
+
+@unittest.skipUnless(display_available, "No hay display disponible")
+class TestLogFilter(unittest.TestCase):
+    def setUp(self):
+        self._original_handler = GLib.log_default_handler
+
+    def tearDown(self):
+        GLib.log_default_handler = self._original_handler
+
+    def test_installs_once(self):
+        install_log_filter()
+        install_log_filter()
+
+    def _spy(self):
+        calls = []
+        GLib.log_default_handler = lambda d, l, m: calls.append(m)
+        return calls
+
+    def test_matching_measure_warning_is_swallowed(self):
+        calls = self._spy()
+        _swallow_libadwaita_measure_warnings(
+            None,
+            GLib.LogLevelFlags.LEVEL_WARNING,
+            "AdwBreakpointBin reported min height 613 and natural height 512 in "
+            "measure() with for_size=572; natural size must be >= min size",
+        )
+        self.assertEqual(calls, [])
+
+    def test_other_warnings_pass_through(self):
+        calls = self._spy()
+        _swallow_libadwaita_measure_warnings(
+            None, GLib.LogLevelFlags.LEVEL_WARNING, "otra cosa"
+        )
+        self.assertEqual(calls, ["otra cosa"])
 
 
 if __name__ == "__main__":
