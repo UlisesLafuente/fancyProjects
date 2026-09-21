@@ -164,7 +164,7 @@ class ProjectWindow(Adw.ApplicationWindow):
         project = Project(
             data["project_name"],
             [
-                Page([Task(name, 0) for name in data["tasks"]])
+                Page([Task(name, hours) for name, hours in data["tasks"]])
                 for _ in range(data["pages"])
             ],
             workflow_type=data["workflow_type"],
@@ -208,8 +208,8 @@ class ProjectWindow(Adw.ApplicationWindow):
 
 
 class ProjectApp(Adw.Application):
-    def __init__(self):
-        super().__init__(application_id=APP_ID)
+    def __init__(self, application_id=APP_ID):
+        super().__init__(application_id=application_id)
         self.repository = ProjectRepository()
 
     def do_startup(self):

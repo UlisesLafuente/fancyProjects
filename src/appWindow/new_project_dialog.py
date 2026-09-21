@@ -59,11 +59,19 @@ class NewProjectDialog(Adw.Dialog):
         add_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.entry_task = Gtk.Entry()
         self.entry_task.set_hexpand(True)
+        self.entry_task.set_placeholder_text("Nombre de la tarea")
+        self.spin_task_hours = Gtk.SpinButton.new_with_range(1, 1000, 1)
+        self.spin_task_hours.set_value(1)
+        self.spin_task_hours.set_tooltip_text("Horas estimadas")
+        hours_label = Gtk.Label(label="h")
         add_btn = Gtk.Button(label="Añadir")
         add_btn.add_css_class("suggested-action")
         self.entry_task.connect("activate", self._on_add_task)
+        self.spin_task_hours.connect("activate", self._on_add_task)
         add_btn.connect("clicked", self._on_add_task)
         add_row.append(self.entry_task)
+        add_row.append(self.spin_task_hours)
+        add_row.append(hours_label)
         add_row.append(add_btn)
         add_row.set_margin_top(6)
         box.append(add_row)
@@ -124,14 +132,16 @@ class NewProjectDialog(Adw.Dialog):
 
     def _on_add_task(self, *args):
         name = self.entry_task.get_text().strip()
-        if name and name not in self._tasks:
-            self._tasks.append(name)
-            self._add_task_row(name)
+        hours = int(self.spin_task_hours.get_value())
+        if name and all(task_name != name for task_name, _ in self._tasks):
+            self._tasks.append((name, hours))
+            self._add_task_row(name, hours)
             self.error_label.set_visible(False)
         self.entry_task.set_text("")
+        self.spin_task_hours.set_value(1)
         self.entry_task.grab_focus()
 
-    def _add_task_row(self, name):
+    def _add_task_row(self, name, hours):
         row = Gtk.ListBoxRow()
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         box.set_margin_start(12)
@@ -141,6 +151,8 @@ class NewProjectDialog(Adw.Dialog):
 
         label = Gtk.Label(label=name, xalign=0.0)
         label.set_hexpand(True)
+        hours_label = Gtk.Label(label="{} h".format(hours))
+        hours_label.add_css_class("dim-label")
         remove_btn = Gtk.Button()
         remove_btn.set_child(Gtk.Image.new_from_icon_name("list-remove-symbolic"))
         remove_btn.add_css_class("flat")
@@ -148,13 +160,13 @@ class NewProjectDialog(Adw.Dialog):
         remove_btn.connect("clicked", self._on_remove_task, name, row)
 
         box.append(label)
+        box.append(hours_label)
         box.append(remove_btn)
         row.set_child(box)
         self.tasks_box.append(row)
 
     def _on_remove_task(self, button, name, row):
-        if name in self._tasks:
-            self._tasks.remove(name)
+        self._tasks = [task for task in self._tasks if task[0] != name]
         self.tasks_box.remove(row)
 
     def _is_valid(self):

@@ -14,8 +14,8 @@ from gi.repository import Adw, Gtk
 
 display_available = Gtk.init_check()
 
-from appWindow.app_window import ProjectApp, ProjectPickerDialog, install_stylesheet, STYLE_CSS
-from appWindow.main_view import ProjectView, RowItem, WORKFLOW_LABELS
+from appWindow.app_window import ProjectApp, ProjectPickerDialog, ProjectWindow, install_stylesheet, STYLE_CSS
+from appWindow.main_view import ProjectView, WORKFLOW_LABELS
 from appWindow.new_project_dialog import NewProjectDialog
 from persistence.project_repository import ProjectRepository
 from projects.Page import Page
@@ -39,8 +39,9 @@ class TestNewProjectDialog(unittest.TestCase):
     def test_get_data(self):
         self.dialog.entry_name.set_text("Comic de superheroes")
         self.dialog.spin_pages.set_value(15)
-        for name in ("Boceto", "Tinta", "Color"):
+        for name, hours in (("Boceto", 2), ("Tinta", 3), ("Color", 4)):
             self.dialog.entry_task.set_text(name)
+            self.dialog.spin_task_hours.set_value(hours)
             self.dialog._on_add_task()
             self.dialog.entry_task.set_text("")
         self.dialog.radio_by_task.set_active(True)
@@ -48,8 +49,20 @@ class TestNewProjectDialog(unittest.TestCase):
         data = self.dialog.get_data()
         self.assertEqual(data["project_name"], "Comic de superheroes")
         self.assertEqual(data["pages"], 15)
-        self.assertEqual(data["tasks"], ["Boceto", "Tinta", "Color"])
+        self.assertEqual(data["tasks"], [("Boceto", 2), ("Tinta", 3), ("Color", 4)])
         self.assertEqual(data["workflow_type"], WorkflowType.BY_TASK)
+
+    def test_add_task_defaults_to_one_hour(self):
+        self.dialog.entry_task.set_text("Boceto")
+        self.dialog._on_add_task()
+        self.assertEqual(self.dialog._tasks, [("Boceto", 1)])
+
+    def test_add_task_ignores_duplicates(self):
+        self.dialog.entry_task.set_text("Boceto")
+        self.dialog._on_add_task()
+        self.dialog.entry_task.set_text("Boceto")
+        self.dialog._on_add_task()
+        self.assertEqual(self.dialog._tasks, [("Boceto", 1)])
 
     def test_remove_task(self):
         self.dialog.entry_task.set_text("Boceto")
@@ -83,11 +96,14 @@ class TestProjectView(unittest.TestCase):
         self.assertEqual(self.view.project_title.get_text(), "Comic")
         self.assertIn(WORKFLOW_LABELS[WorkflowType.BY_TASK], self.view.workflow_label.get_text())
 
-        self.assertEqual(self.view.store.get_n_items(), 6)
-        first = self.view.store.get_item(0)
-        self.assertEqual(first.element, "Página 1")
-        self.assertTrue(first.bold)
-        self.assertEqual(self.view.store.get_item(1).element, "  Boceto")
+        self.assertEqual(len(self.view.page_expanders), 2)
+        first = self.view.page_expanders[0]
+        self.assertIsInstance(first, Adw.ExpanderRow)
+        self.assertEqual(first.get_title(), "Página 1")
+        self.assertFalse(first.get_expanded())
+        self.assertEqual(len(self.view.task_rows[0]), 2)
+        self.assertEqual(self.view.task_rows[0][0].get_title(), "Boceto")
+        self.assertEqual(self.view.task_rows[0][0].get_subtitle(), "Pendiente")
 
     def test_show_empty_returns_to_empty_state(self):
         self.view.show_empty()
@@ -99,7 +115,9 @@ class TestProjectApp(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.tempdir.name) / "gui_projects.db"
-        self.app = ProjectApp()
+        app_id = "com.ulises.fancyprojects.test{}".format(id(self))
+        self.app = ProjectApp(application_id=app_id)
+        self.app.register()
 
     def tearDown(self):
         self.app.quit()
@@ -110,6 +128,24 @@ class TestProjectApp(unittest.TestCase):
         project = Project("Demo", [])
         self.app.repository.save_project(project)
         self.assertIsNotNone(self.app.repository.load_project(project.id))
+
+    def test_create_project_applies_task_hours(self):
+        window = ProjectWindow(application=self.app)
+        window._create_project({
+            "project_name": "Comic de superheroes",
+            "pages": 2,
+            "tasks": [("Boceto", 2), ("Tinta", 3)],
+            "workflow_type": WorkflowType.BY_TASK,
+        })
+        project = window.current_project
+        self.assertEqual(len(project.getPages()), 2)
+        tasks = project.getPages()[0].getTasks()
+        self.assertEqual(
+            [(t.getTaskName(), t.getHoursPredicted()) for t in tasks],
+            [("Boceto", 2), ("Tinta", 3)],
+        )
+        self.assertEqual(project.getTotalEstimatedHours(), 10)
+        window.destroy()
 
     def test_picker_dialog_requires_selection(self):
         projects = [Project("A", []), Project("B", [])]

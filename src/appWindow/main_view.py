@@ -3,24 +3,18 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Gio, GObject, Gtk, Pango
+from gi.repository import Adw, Gtk
 
 from appWindow.new_project_dialog import WORKFLOW_LABELS
-
-
-class RowItem(GObject.Object):
-    def __init__(self, element="", hours="", state="", bold=False):
-        super().__init__()
-        self.element = element
-        self.hours = hours
-        self.state = state
-        self.bold = bold
 
 
 class ProjectView(Gtk.Stack):
     def __init__(self):
         super().__init__()
         self.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+
+        self.page_expanders = []
+        self.task_rows = []
 
         self.empty_page = self._build_empty_page()
         self.project_page = self._build_project_page()
@@ -68,50 +62,15 @@ class ProjectView(Gtk.Stack):
         self.header_box.append(self.summary_label)
         page.append(self.header_box)
 
-        self.store = Gio.ListStore.new(RowItem)
-        model = Gtk.SingleSelection.new(self.store)
-        self.column_view = Gtk.ColumnView(model=model)
-        self.column_view.set_vexpand(True)
-        self.column_view.set_hexpand(True)
-
-        self._append_column("Elemento", lambda row: row.element, 0)
-        self._append_column("Horas", lambda row: row.hours, 160)
-        self._append_column("Estado", lambda row: row.state, 160)
+        self.pages_list = Gtk.ListBox()
+        self.pages_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.pages_list.add_css_class("boxed-list")
 
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_vexpand(True)
-        scrolled.set_child(self.column_view)
+        scrolled.set_child(self.pages_list)
         page.append(scrolled)
         return page
-
-    def _append_column(self, title, getter, width):
-        column = Gtk.ColumnViewColumn(title=title)
-        if width:
-            column.set_fixed_width(width)
-        factory = Gtk.SignalListItemFactory()
-        factory.connect("setup", self._factory_setup)
-        factory.connect("bind", lambda factory, list_item: self._factory_bind(factory, list_item, getter))
-        column.set_factory(factory)
-        self.column_view.append_column(column)
-
-    @staticmethod
-    def _factory_setup(factory, list_item):
-        label = Gtk.Label(label="", xalign=0.0)
-        label.set_margin_start(12)
-        label.set_margin_end(12)
-        list_item.set_child(label)
-
-    @staticmethod
-    def _factory_bind(factory, list_item, getter):
-        label = list_item.get_child()
-        row = list_item.get_item()
-        label.set_text(getter(row))
-        if row.bold:
-            attributes = Pango.AttrList()
-            attributes.insert(Pango.attr_weight_new(Pango.Weight.BOLD))
-            label.set_attributes(attributes)
-        else:
-            label.set_attributes(None)
 
     def show_empty(self):
         self.set_visible_child_name("empty")
@@ -129,19 +88,32 @@ class ProjectView(Gtk.Stack):
             )
         )
 
-        self.store.remove_all()
+        self.pages_list.remove_all()
+        self.page_expanders = []
+        self.task_rows = []
+
         for page_index, page in enumerate(project.getPages(), start=1):
-            self.store.append(RowItem(
-                element="Página {}".format(page_index),
-                hours="{:.0f} h".format(page.getTotalEstimatedHours()),
-                state="",
-                bold=True,
-            ))
+            expander = Adw.ExpanderRow()
+            expander.set_title("Página {}".format(page_index))
+            expander.set_subtitle(
+                "{:.0f} h estimadas · {:.0f}% completado".format(
+                    page.getTotalEstimatedHours(),
+                    page.getPercentileCompleted(),
+                )
+            )
+
+            task_rows = []
             for task in page.getTasks():
-                state = "Completada" if task.getCompletedTask() else "Pendiente"
-                self.store.append(RowItem(
-                    element="  " + task.getTaskName(),
-                    hours="{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted()),
-                    state=state,
-                    bold=False,
-                ))
+                row = Adw.ActionRow(title=task.getTaskName())
+                row.set_subtitle("Completada" if task.getCompletedTask() else "Pendiente")
+                hours = Gtk.Label(
+                    label="{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted())
+                )
+                hours.add_css_class("dim-label")
+                row.add_suffix(hours)
+                expander.add_row(row)
+                task_rows.append(row)
+
+            self.pages_list.append(expander)
+            self.page_expanders.append(expander)
+            self.task_rows.append(task_rows)
