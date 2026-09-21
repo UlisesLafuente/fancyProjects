@@ -5,20 +5,6 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gtk
 
-from projects.Project import WorkflowType
-
-
-WORKFLOW_LABELS = {
-    WorkflowType.CONTINUOUS: "Workflow continuo",
-    WorkflowType.BY_TASK: "Workflow por tareas",
-}
-
-
-WORKFLOW_DESCRIPTIONS = {
-    WorkflowType.CONTINUOUS: "Se hacen todas las tareas de cada página,\npor orden consecutivo.",
-    WorkflowType.BY_TASK: "Primero se completan todas las tareas de un tipo\nsobre todas las páginas, y luego la siguiente tarea.",
-}
-
 
 class NewProjectDialog(Adw.Dialog):
     def __init__(self, on_create=None):
@@ -76,23 +62,6 @@ class NewProjectDialog(Adw.Dialog):
         add_row.set_margin_top(6)
         box.append(add_row)
 
-        workflow_group = Adw.PreferencesGroup(title="Workflow")
-        self.radio_continuous = Gtk.CheckButton()
-        self.radio_continuous.set_active(True)
-        self.radio_by_task = Gtk.CheckButton(group=self.radio_continuous)
-
-        self._append_workflow_option(
-            workflow_group, self.radio_continuous,
-            WORKFLOW_LABELS[WorkflowType.CONTINUOUS],
-            WORKFLOW_DESCRIPTIONS[WorkflowType.CONTINUOUS],
-        )
-        self._append_workflow_option(
-            workflow_group, self.radio_by_task,
-            WORKFLOW_LABELS[WorkflowType.BY_TASK],
-            WORKFLOW_DESCRIPTIONS[WorkflowType.BY_TASK],
-        )
-        box.append(workflow_group)
-
         self.error_label = Gtk.Label(label="", xalign=0.0)
         self.error_label.add_css_class("error")
         self.error_label.set_visible(False)
@@ -111,12 +80,12 @@ class NewProjectDialog(Adw.Dialog):
 
         self.set_child(box)
 
-    @staticmethod
-    def _append_workflow_option(group, checkbutton, title, description):
-        row = Adw.ActionRow(title=title, subtitle=description)
-        row.set_activatable_widget(checkbutton)
-        row.add_suffix(checkbutton)
-        group.add(row)
+    def get_data(self):
+        return {
+            "project_name": self.entry_name.get_text().strip(),
+            "pages": int(self.spin_pages.get_value()),
+            "tasks": list(self._tasks),
+        }
 
     def _on_cancel(self, *args):
         self.close()
@@ -128,7 +97,9 @@ class NewProjectDialog(Adw.Dialog):
             return
         if self._create_callback is not None:
             self._create_callback(self.get_data())
-        self.close()
+            self.close()
+        else:
+            self.close()
 
     def _on_add_task(self, *args):
         name = self.entry_task.get_text().strip()
@@ -178,16 +149,3 @@ class NewProjectDialog(Adw.Dialog):
         if not self._tasks:
             return "Añade al menos una tarea."
         return ""
-
-    def get_workflow_type(self):
-        if self.radio_by_task.get_active():
-            return WorkflowType.BY_TASK
-        return WorkflowType.CONTINUOUS
-
-    def get_data(self):
-        return {
-            "project_name": self.entry_name.get_text().strip(),
-            "pages": int(self.spin_pages.get_value()),
-            "tasks": list(self._tasks),
-            "workflow_type": self.get_workflow_type(),
-        }

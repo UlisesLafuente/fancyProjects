@@ -5,8 +5,6 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gtk
 
-from appWindow.new_project_dialog import WORKFLOW_LABELS
-
 
 def _task_subtitle(task):
     state = "Completada" if task.getCompletedTask() else "Pendiente"
@@ -133,13 +131,10 @@ class ProjectView(Gtk.Stack):
         self.header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.project_title = Gtk.Label(label="", xalign=0.0)
         self.project_title.add_css_class("title-1")
-        self.workflow_label = Gtk.Label(label="", xalign=0.0)
-        self.workflow_label.add_css_class("dim-label")
         self.summary_label = Gtk.Label(label="", xalign=0.0)
         self.summary_label.add_css_class("dim-label")
 
         self.header_box.append(self.project_title)
-        self.header_box.append(self.workflow_label)
         self.header_box.append(self.summary_label)
         page.append(self.header_box)
 
@@ -227,7 +222,6 @@ class ProjectView(Gtk.Stack):
         self.set_visible_child_name("project")
 
         self.project_title.set_text(project.projectName)
-        self.workflow_label.set_text(WORKFLOW_LABELS.get(project.workflow_type, project.workflow_type))
         self._update_summary(project)
 
         self.pages_list.remove_all()

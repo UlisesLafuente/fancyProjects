@@ -11,7 +11,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 from persistence.project_io import export_project, import_project
 from persistence.project_repository import ProjectRepository
 from projects.Page import Page
-from projects.Project import Project
+from projects.Project import Project, WorkflowType
 from projects.Task import Task
 
 from appWindow.hour_grid import HourGridView
@@ -20,6 +20,11 @@ from appWindow.new_project_dialog import NewProjectDialog
 
 APP_ID = "com.ulises.fancyprojects"
 APP_ICON_NAME = APP_ID
+
+VIEW_MODE_LABELS = {
+    WorkflowType.CONTINUOUS: "Workflow continuo",
+    WorkflowType.BY_TASK: "Workflow por tareas (página a página)",
+}
 
 
 def resource_path(relative: str) -> Path:
@@ -154,6 +159,7 @@ class ProjectWindow(Adw.ApplicationWindow):
         self.set_default_size(920, 660)
         self.set_title("Gestor de Proyectos")
         self.current_project = None
+        self.view_mode = WorkflowType.CONTINUOUS
         self._refresh_scheduled = False
         self._pending_pages = set()
         self._pending_full = False
@@ -219,6 +225,13 @@ class ProjectWindow(Adw.ApplicationWindow):
         file_menu.append("Eliminar proyecto…", "app.delete-project")
         file_menu.append("Salir", "app.quit")
         root.append_submenu("File", file_menu)
+
+        view_menu = Gio.Menu()
+        for mode in (WorkflowType.CONTINUOUS, WorkflowType.BY_TASK):
+            item = Gio.MenuItem.new(VIEW_MODE_LABELS[mode], "app.view-workflow")
+            item.set_attribute_value("target", GLib.Variant.new_string(mode))
+            view_menu.append_item(item)
+        root.append_submenu("View", view_menu)
         return Gtk.PopoverMenuBar.new_from_model(root)
 
     def _set_status(self, message):
@@ -235,7 +248,6 @@ class ProjectWindow(Adw.ApplicationWindow):
                 Page([Task(name, hours) for name, hours in data["tasks"]])
                 for _ in range(data["pages"])
             ],
-            workflow_type=data["workflow_type"],
         )
         self.current_project = project
         self.view.show_project(project)
@@ -313,7 +325,7 @@ class ProjectWindow(Adw.ApplicationWindow):
         self._pending_pages.clear()
         self._pending_full = False
         self.view.refresh_page(project, page)
-        self.hour_view.show_project(project)
+        self.hour_view.update_task_hours(task, page)
         try:
             page_number = project.getPages().index(page) + 1
         except ValueError:
@@ -323,6 +335,11 @@ class ProjectWindow(Adw.ApplicationWindow):
                 task.getTaskName(), page_number, task.getHoursPredicted()
             )
         )
+
+    def _apply_view_mode(self, mode):
+        self.view_mode = mode
+        self.hour_view.set_view_mode(mode)
+        self._set_status("Vista: {}.".format(VIEW_MODE_LABELS[mode]))
 
     def _on_save_clicked(self, *args):
         project = self.current_project
@@ -481,6 +498,20 @@ class ProjectApp(Adw.Application):
             if accels is not None:
                 self.set_accels_for_action("app." + name, accels)
         self.set_accels_for_action("app.quit", ["<Control>q"])
+
+        view_mode = Gio.SimpleAction.new_stateful(
+            "view-workflow",
+            GLib.VariantType.new("s"),
+            GLib.Variant.new_string(WorkflowType.CONTINUOUS),
+        )
+        view_mode.connect("activate", self._action_view_workflow)
+        self.add_action(view_mode)
+
+    def _action_view_workflow(self, action, param):
+        action.set_state(param)
+        window = self.props.active_window
+        if window is not None:
+            window._apply_view_mode(param.unpack())
 
     def _action_new(self, action, param):
         window = self.props.active_window

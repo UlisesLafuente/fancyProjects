@@ -15,11 +15,14 @@ class HourGridView(Gtk.ScrolledWindow):
         super().__init__()
         self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         self.on_change = on_change
+        self.view_mode = WorkflowType.CONTINUOUS
         self._syncing = False
         self._color_index = {}
+        self._project = None
         self.page_boxes = []
         self.task_checkboxes = []
         self.page_checks = []
+        self._hours_slots = {}
 
         self.container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.container.set_margin_top(12)
@@ -42,22 +45,31 @@ class HourGridView(Gtk.ScrolledWindow):
         self.page_boxes = []
         self.task_checkboxes = []
         self.page_checks = []
+        self._hours_slots = {}
+        self._project = None
         label = Gtk.Label(label="No hay ningún proyecto abierto")
         label.add_css_class("dim-label")
         label.set_valign(Gtk.Align.CENTER)
         label.set_vexpand(True)
         self.container.append(label)
 
+    def set_view_mode(self, mode):
+        self.view_mode = mode
+        if self._project is not None:
+            self.show_project(self._project)
+
     def show_project(self, project):
         self._clear()
         self.page_boxes = []
         self.task_checkboxes = []
         self.page_checks = []
+        self._hours_slots = {}
+        self._project = project
         self._color_index = self._task_color_indices(project)
 
         self.container.append(self._build_legend())
 
-        if project.workflow_type == WorkflowType.BY_TASK:
+        if self.view_mode == WorkflowType.BY_TASK:
             self._build_by_task(project)
         else:
             self._build_continuous(project)
@@ -113,7 +125,9 @@ class HourGridView(Gtk.ScrolledWindow):
             page_box.append(header)
 
             for task in page.getTasks():
-                page_box.append(self._build_task_box(task, page))
+                task_box = self._build_task_box(task, page)
+                page_box.append(task_box)
+                self._hours_slots[(task, page)] = (task_box, task_box.get_first_child())
 
             self.container.append(page_box)
             self.page_boxes.append(page_box)
@@ -150,9 +164,11 @@ class HourGridView(Gtk.ScrolledWindow):
                 page_label.add_css_class("dim-label")
                 page_label.set_width_chars(4)
                 row.append(page_label)
-                row.append(self._completion_check(page))
+                check = self._completion_check(page)
+                row.append(check)
                 row.append(self._build_hours(task, page))
                 group.append(row)
+                self._hours_slots[(task, page)] = (row, check)
 
             self.container.append(group)
             self.page_boxes.append(group)
@@ -196,3 +212,16 @@ class HourGridView(Gtk.ScrolledWindow):
         self._syncing = False
         if self.on_change is not None:
             self.on_change(task, page)
+
+    def update_task_hours(self, task, page):
+        slot = self._hours_slots.get((task, page))
+        if slot is None:
+            return
+        parent, ref = slot
+        parent.remove(parent.get_last_child())
+        for index, (existing, _boxes) in enumerate(self.task_checkboxes):
+            if existing is task:
+                del self.task_checkboxes[index]
+                break
+        parent.insert_child_after(self._build_hours(task, page), ref)
+        self.refresh_status()
