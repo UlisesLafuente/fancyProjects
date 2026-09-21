@@ -1,5 +1,6 @@
 class Project:
-    def __init__(self, name, pages):
+    def __init__(self, name, pages, id=None):
+        self.id = id
         self.projectName = name
         self.pages = pages
 

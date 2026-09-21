@@ -1,5 +1,6 @@
 class Task:
-    def __init__(self, taskName: str, hours: int):
+    def __init__(self, taskName: str, hours: int, id=None):
+        self.id = id
         self.taskName = taskName
         self.hoursPredicted = hours
         self.hoursCompleted = 0

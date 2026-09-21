@@ -1,5 +1,6 @@
 class Page:
-    def __init__(self, tasks):
+    def __init__(self, tasks, id=None):
+        self.id = id
         self.tasks = tasks
 
     def addTask(self, task):
