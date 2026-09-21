@@ -21,7 +21,12 @@ a = Analysis(
             "icons": ["Adwaita", "hicolor"],
             "themes": ["Adwaita"],
             "languages": [],
-            "module-versions": {},
+            "module-versions": {
+                "Gtk": "4.0",
+                "Gdk": "4.0",
+                "Adw": "1",
+                "GdkPixbuf": "2.0",
+            },
         },
     },
     runtime_hooks=[str(ROOT / "packaging" / "runtime_hook.py")],

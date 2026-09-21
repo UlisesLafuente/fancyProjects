@@ -1,7 +1,7 @@
 !include "MUI2.nsh"
 
 Name "Fancy Projects"
-OutFile "dist\FancyProjects-{{VERSION}}-windows-installer.exe"
+OutFile "{{ROOT}}\dist\FancyProjects-{{VERSION}}-windows-installer.exe"
 InstallDir "$PROGRAMFILES64\Fancy Projects"
 RequestExecutionLevel admin
 Unicode true
@@ -15,7 +15,7 @@ Unicode true
 
 Section "install"
     SetOutPath "$INSTDIR"
-    File /r "dist\fancyprojects\*.*"
+    File /r "{{ROOT}}\dist\fancyprojects\*.*"
     CreateShortcut "$SMPROGRAMS\Fancy Projects.lnk" "$INSTDIR\fancyprojects.exe"
     CreateShortcut "$DESKTOP\Fancy Projects.lnk" "$INSTDIR\fancyprojects.exe"
     WriteUninstaller "$INSTDIR\Uninstall.exe"

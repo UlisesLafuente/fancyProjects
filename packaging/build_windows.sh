@@ -26,7 +26,9 @@ SPEC="$(cygpath -m "$ROOT/packaging/fancyprojects.spec")"
 python -m PyInstaller --noconfirm --clean "$SPEC"
 
 echo "==> Instalador NSIS"
-sed "s/{{VERSION}}/${VERSION}/" packaging/fancyprojects.nsi > build/fancyprojects.nsi
+sed -e "s/{{VERSION}}/${VERSION}/g" \
+    -e "s|{{ROOT}}|$(cygpath -m "$ROOT")|g" \
+    packaging/fancyprojects.nsi > build/fancyprojects.nsi
 makensis build/fancyprojects.nsi
 ls -lh "dist/FancyProjects-${VERSION}-windows-installer.exe"
 

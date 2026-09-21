@@ -43,7 +43,6 @@ rm -rf build/pyi_mac dist/Fancy\ Projects.app
 .venv/bin/pyinstaller --noconfirm --clean \
     --distpath "$ROOT/dist" \
     --workpath "$ROOT/build/pyi_mac" \
-    --specpath "$ROOT/build" \
     "$ROOT/packaging/fancyprojects.spec"
 
 echo "==> Firma ad-hoc"
