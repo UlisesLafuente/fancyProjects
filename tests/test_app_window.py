@@ -416,6 +416,22 @@ class TestImportExportDelete(unittest.TestCase):
         self.assertEqual(len(self.app.repository.list_projects()), 1)
         self.assertIsNotNone(self.window.current_project)
 
+    def test_close_project_returns_to_empty_state(self):
+        self._open_saved_project()
+        self.assertEqual(self.window.view.get_visible_child_name(), "project")
+
+        self.window._on_close_clicked()
+
+        self.assertIsNone(self.window.current_project)
+        self.assertEqual(self.window.view.get_visible_child_name(), "empty")
+        self.assertEqual(self.window.hour_view.task_checkboxes, [])
+        self.assertIn("cerrado", self.window.status_label.get_text())
+
+    def test_close_without_project_shows_info(self):
+        self.assertIsNone(self.window.current_project)
+        self.window._on_close_clicked()
+        self.assertEqual(self.window.view.get_visible_child_name(), "empty")
+
 
 @unittest.skipUnless(display_available, "No hay display disponible")
 class TestStylesheet(unittest.TestCase):

@@ -176,6 +176,7 @@ class ProjectWindow(Adw.ApplicationWindow):
         file_menu = Gio.Menu()
         file_menu.append("Nuevo proyecto…", "app.new-project")
         file_menu.append("Abrir…", "app.open-project")
+        file_menu.append("Cerrar proyecto", "app.close-project")
         file_menu.append("Guardar", "app.save-project")
         file_menu.append("Importar proyecto…", "app.import-project")
         file_menu.append("Exportar proyecto…", "app.export-project")
@@ -223,6 +224,18 @@ class ProjectWindow(Adw.ApplicationWindow):
             self.view.show_project(project)
             self.hour_view.show_project(project)
             self._set_status("Proyecto \"{}\" cargado.".format(project.projectName))
+
+    def _on_close_clicked(self, *args):
+        if self.current_project is None:
+            self._show_info("Cerrar proyecto", "No hay ningún proyecto abierto para cerrar.")
+            return
+        self.current_project = None
+        self._pending_pages.clear()
+        self._pending_full = False
+        self._refresh_scheduled = False
+        self.view.show_empty()
+        self.hour_view.show_empty()
+        self._set_status("Proyecto cerrado. Listo.")
 
     def _on_hours_changed(self, task=None, page=None):
         if self.current_project is None:
@@ -398,6 +411,7 @@ class ProjectApp(Adw.Application):
         handlers = {
             "new-project": (self._action_new, ["<Control>n"]),
             "open-project": (self._action_open, ["<Control>o"]),
+            "close-project": (self._action_close, None),
             "save-project": (self._action_save, ["<Control>s"]),
             "import-project": (self._action_import, None),
             "export-project": (self._action_export, None),
@@ -425,6 +439,11 @@ class ProjectApp(Adw.Application):
         window = self.props.active_window
         if window is not None:
             window._on_save_clicked()
+
+    def _action_close(self, action, param):
+        window = self.props.active_window
+        if window is not None:
+            window._on_close_clicked()
 
     def _action_import(self, action, param):
         window = self.props.active_window
