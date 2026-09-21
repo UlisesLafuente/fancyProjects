@@ -8,14 +8,93 @@ from gi.repository import Adw, Gtk
 from appWindow.new_project_dialog import WORKFLOW_LABELS
 
 
+def _task_subtitle(task):
+    state = "Completada" if task.getCompletedTask() else "Pendiente"
+    return "{} · {:.0f} / {:.0f} h".format(
+        state, task.getHoursCompleted(), task.getHoursPredicted()
+    )
+
+
+class HoursStepper(Gtk.Box):
+    MIN_HOURS = 1
+    MAX_HOURS = 1000
+
+    def __init__(self, hours, on_change=None):
+        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=1)
+        self._hours = int(hours)
+        self._on_change = on_change
+
+        self.minus = Gtk.Button()
+        self.minus.set_child(Gtk.Image.new_from_icon_name("list-remove-symbolic"))
+        self.minus.add_css_class("flat")
+        self.minus.set_tooltip_text("Reducir horas estimadas")
+        self.minus.connect("clicked", self._on_minus)
+
+        self.entry = Gtk.Entry()
+        self.entry.set_width_chars(3)
+        self.entry.set_max_length(4)
+        self.entry.set_text(str(self._hours))
+        self.entry.set_input_purpose(Gtk.InputPurpose.NUMBER)
+        self.entry.connect("activate", self._on_entry_commit)
+        focus_controller = Gtk.EventControllerFocus()
+        focus_controller.connect("leave", self._on_entry_commit)
+        self.entry.add_controller(focus_controller)
+
+        self.plus = Gtk.Button()
+        self.plus.set_child(Gtk.Image.new_from_icon_name("list-add-symbolic"))
+        self.plus.add_css_class("flat")
+        self.plus.set_tooltip_text("Aumentar horas estimadas")
+        self.plus.connect("clicked", self._on_plus)
+
+        hours_label = Gtk.Label(label=" h")
+        hours_label.add_css_class("dim-label")
+
+        self.append(self.minus)
+        self.append(self.entry)
+        self.append(self.plus)
+        self.append(hours_label)
+
+    def _emit(self, value):
+        if not (self.MIN_HOURS <= value <= self.MAX_HOURS) or value == self._hours:
+            self.entry.set_text(str(self._hours))
+            return
+        self._hours = value
+        self.entry.set_text(str(value))
+        if self._on_change is not None:
+            self._on_change(value)
+
+    def _on_plus(self, *args):
+        self._emit(self._hours + 1)
+
+    def _on_minus(self, *args):
+        self._emit(self._hours - 1)
+
+    def _on_entry_commit(self, *args):
+        text = self.entry.get_text().strip()
+        try:
+            value = int(text)
+        except ValueError:
+            self.entry.set_text(str(self._hours))
+            return
+        self._emit(value)
+
+    def set_hours(self, hours):
+        self._hours = int(hours)
+        self.entry.set_text(str(self._hours))
+
+    def get_hours(self):
+        return self._hours
+
+
 class ProjectView(Gtk.Stack):
-    def __init__(self):
+    def __init__(self, on_estimated_hours_change=None):
         super().__init__()
         self.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.on_estimated_hours_change = on_estimated_hours_change
 
         self.page_expanders = []
         self.task_rows = []
-        self.task_hours = []
+        self.task_steppers = []
         self.completion_checks = []
 
         self.empty_page = self._build_empty_page()
@@ -118,10 +197,15 @@ class ProjectView(Gtk.Stack):
         )
         self.completion_checks[index].set_visible(page.isCompleted())
         self._set_completed(expander, page.isCompleted(), "page-completed")
-        for task, row, hours in zip(page.getTasks(), self.task_rows[index], self.task_hours[index]):
-            row.set_subtitle("Completada" if task.getCompletedTask() else "Pendiente")
+        for task, row, stepper in zip(page.getTasks(), self.task_rows[index], self.task_steppers[index]):
+            row.set_subtitle(_task_subtitle(task))
             self._set_completed(row, task.getCompletedTask(), "task-completed")
-            hours.set_text("{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted()))
+            stepper.set_hours(task.getHoursPredicted())
+
+    def _on_stepper_change(self, task, page, value):
+        task.setEstimatedHours(value)
+        if self.on_estimated_hours_change is not None:
+            self.on_estimated_hours_change(task, page)
 
     @staticmethod
     def _set_completed(widget, completed, css_class):
@@ -149,7 +233,7 @@ class ProjectView(Gtk.Stack):
         self.pages_list.remove_all()
         self.page_expanders = []
         self.task_rows = []
-        self.task_hours = []
+        self.task_steppers = []
         self.completion_checks = []
 
         for page_index, page in enumerate(project.getPages(), start=1):
@@ -170,21 +254,21 @@ class ProjectView(Gtk.Stack):
             self._set_completed(expander, page.isCompleted(), "page-completed")
 
             task_rows = []
-            task_hours = []
+            task_steppers = []
             for task in page.getTasks():
                 row = Adw.ActionRow(title=task.getTaskName())
-                row.set_subtitle("Completada" if task.getCompletedTask() else "Pendiente")
+                row.set_subtitle(_task_subtitle(task))
                 self._set_completed(row, task.getCompletedTask(), "task-completed")
-                hours = Gtk.Label(
-                    label="{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted())
+                stepper = HoursStepper(
+                    task.getHoursPredicted(),
+                    on_change=lambda value, t=task, p=page: self._on_stepper_change(t, p, value),
                 )
-                hours.add_css_class("dim-label")
-                row.add_suffix(hours)
+                row.add_suffix(stepper)
                 expander.add_row(row)
                 task_rows.append(row)
-                task_hours.append(hours)
+                task_steppers.append(stepper)
 
             self.pages_list.append(expander)
             self.page_expanders.append(expander)
             self.task_rows.append(task_rows)
-            self.task_hours.append(task_hours)
+            self.task_steppers.append(task_steppers)

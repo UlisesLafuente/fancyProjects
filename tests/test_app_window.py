@@ -105,7 +105,7 @@ class TestProjectView(unittest.TestCase):
         self.assertFalse(first.get_expanded())
         self.assertEqual(len(self.view.task_rows[0]), 2)
         self.assertEqual(self.view.task_rows[0][0].get_title(), "Boceto")
-        self.assertEqual(self.view.task_rows[0][0].get_subtitle(), "Pendiente")
+        self.assertEqual(self.view.task_rows[0][0].get_subtitle(), "Pendiente · 0 / 2 h")
 
     def test_show_empty_returns_to_empty_state(self):
         self.view.show_empty()
@@ -129,17 +129,17 @@ class TestProjectView(unittest.TestCase):
         project = Project("Comic", [Page([task])])
         self.view.show_project(project)
         row = self.view.task_rows[0][0]
-        hours = self.view.task_hours[0][0]
+        stepper = self.view.task_steppers[0][0]
 
         task.setHoursCompleted(1)
         self.view.refresh(project)
 
-        self.assertEqual(row.get_subtitle(), "Pendiente")
-        self.assertEqual(hours.get_text(), "1 / 2 h")
+        self.assertEqual(row.get_subtitle(), "Pendiente · 1 / 2 h")
+        self.assertEqual(stepper.get_hours(), 2)
 
         task.setHoursCompleted(2)
         self.view.refresh(project)
-        self.assertEqual(row.get_subtitle(), "Completada")
+        self.assertEqual(row.get_subtitle(), "Completada · 2 / 2 h")
 
     def test_refresh_page_only_updates_that_page(self):
         tasks = [Task("Boceto", 2)]
@@ -149,8 +149,8 @@ class TestProjectView(unittest.TestCase):
         project.getPages()[0].getTasks()[0].setHoursCompleted(2)
         self.view.refresh_page(project, project.getPages()[0])
 
-        self.assertEqual(self.view.task_rows[0][0].get_subtitle(), "Completada")
-        self.assertEqual(self.view.task_rows[1][0].get_subtitle(), "Pendiente")
+        self.assertEqual(self.view.task_rows[0][0].get_subtitle(), "Completada · 2 / 2 h")
+        self.assertEqual(self.view.task_rows[1][0].get_subtitle(), "Pendiente · 0 / 2 h")
         self.assertIsNotNone(self.view.completion_checks[0])
         self.assertFalse(self.view.completion_checks[1].get_visible())
 
@@ -220,6 +220,83 @@ class TestProjectView(unittest.TestCase):
         self.view.refresh(project)
         self.assertFalse(self.view.task_rows[0][0].has_css_class("task-completed"))
         self.assertFalse(self.view.page_expanders[0].has_css_class("page-completed"))
+
+    def test_task_row_has_hours_stepper(self):
+        project = Project("Comic", [Page([Task("Boceto", 2)])])
+        self.view.show_project(project)
+        stepper = self.view.task_steppers[0][0]
+        self.assertEqual(stepper.get_hours(), 2)
+        self.assertEqual(stepper.entry.get_text(), "2")
+
+    def test_plus_increments_estimated_hours(self):
+        changes = []
+        view = ProjectView(on_estimated_hours_change=lambda t, p: changes.append(t))
+        project = Project("Comic", [Page([Task("Boceto", 2)])])
+        view.show_project(project)
+        task = project.getPages()[0].getTasks()[0]
+
+        view.task_steppers[0][0]._on_plus()
+
+        self.assertEqual(task.getHoursPredicted(), 3)
+        self.assertEqual(task.getHoursLeft(), 3)
+        self.assertEqual(changes, [task])
+
+    def test_minus_decrements_estimated_hours(self):
+        view = ProjectView()
+        project = Project("Comic", [Page([Task("Boceto", 3)])])
+        view.show_project(project)
+        task = project.getPages()[0].getTasks()[0]
+
+        view.task_steppers[0][0]._on_minus()
+
+        self.assertEqual(task.getHoursPredicted(), 2)
+        self.assertEqual(view.task_steppers[0][0].get_hours(), 2)
+
+    def test_minus_floors_at_one(self):
+        view = ProjectView()
+        project = Project("Comic", [Page([Task("Boceto", 1)])])
+        view.show_project(project)
+        task = project.getPages()[0].getTasks()[0]
+
+        view.task_steppers[0][0]._on_minus()
+
+        self.assertEqual(task.getHoursPredicted(), 1)
+        self.assertEqual(view.task_steppers[0][0].get_hours(), 1)
+
+    def test_entry_commit_applies_value(self):
+        view = ProjectView()
+        project = Project("Comic", [Page([Task("Boceto", 2)])])
+        view.show_project(project)
+        task = project.getPages()[0].getTasks()[0]
+
+        stepper = view.task_steppers[0][0]
+        stepper.entry.set_text("7")
+        stepper._on_entry_commit()
+
+        self.assertEqual(task.getHoursPredicted(), 7)
+        self.assertEqual(stepper.get_hours(), 7)
+
+    def test_entry_commit_rejects_invalid_values(self):
+        view = ProjectView()
+        project = Project("Comic", [Page([Task("Boceto", 2)])])
+        view.show_project(project)
+        task = project.getPages()[0].getTasks()[0]
+
+        stepper = view.task_steppers[0][0]
+        stepper.entry.set_text("abc")
+        stepper._on_entry_commit()
+        self.assertEqual(task.getHoursPredicted(), 2)
+        self.assertEqual(stepper.get_hours(), 2)
+
+        stepper.entry.set_text("0")
+        stepper._on_entry_commit()
+        self.assertEqual(task.getHoursPredicted(), 2)
+        self.assertEqual(stepper.get_hours(), 2)
+
+        stepper.entry.set_text("2000")
+        stepper._on_entry_commit()
+        self.assertEqual(task.getHoursPredicted(), 2)
+        self.assertEqual(stepper.get_hours(), 2)
 
 
 @unittest.skipUnless(display_available, "No hay display disponible")
@@ -437,6 +514,21 @@ class TestImportExportDelete(unittest.TestCase):
         self.assertEqual(restored.projectName, "Comic")
         self.assertEqual(restored.getTotalEstimatedHours(), 5)
         self.assertIn("copia.fancyproject", self.window.status_label.get_text())
+
+    def test_editing_estimated_hours_updates_views(self):
+        self._open_saved_project()
+        project = self.window.current_project
+        task = project.getPages()[0].getTasks()[0]
+        self.assertEqual(len(self.window.hour_view.task_checkboxes[0][1]), 2)
+
+        task.setEstimatedHours(6)
+        self.window._on_estimated_hours_changed(task, project.getPages()[0])
+
+        self.assertEqual(len(self.window.hour_view.task_checkboxes[0][1]), 6)
+        self.assertEqual(
+            self.window.view.task_rows[0][0].get_subtitle(), "Pendiente · 0 / 6 h"
+        )
+        self.assertIn("6 h", self.window.status_label.get_text())
 
     def test_delete_confirmed_removes_project(self):
         project = self._open_saved_project()

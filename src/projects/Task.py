@@ -40,6 +40,15 @@ class Task:
         self.hoursLeft = self.hoursPredicted - hoursCompleted
         self.completedTask = hoursCompleted >= self.hoursPredicted
 
+    def setEstimatedHours(self, hoursEstimated: int):
+        if hoursEstimated < 1:
+            raise ValueError("Estimated hours must be at least 1")
+        self.hoursPredicted = hoursEstimated
+        if self.hoursCompleted > hoursEstimated:
+            self.hoursCompleted = hoursEstimated
+        self.hoursLeft = hoursEstimated - self.hoursCompleted
+        self.completedTask = self.hoursCompleted >= hoursEstimated
+
     def getTaskName(self):
         return self.taskName
 

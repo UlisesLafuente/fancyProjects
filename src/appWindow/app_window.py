@@ -168,7 +168,7 @@ class ProjectWindow(Adw.ApplicationWindow):
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         vbox.append(self._build_menu_bar())
 
-        self.view = ProjectView()
+        self.view = ProjectView(on_estimated_hours_change=self._on_estimated_hours_changed)
         self.hour_view = HourGridView(on_change=self._on_hours_changed)
 
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -304,6 +304,25 @@ class ProjectWindow(Adw.ApplicationWindow):
             "Progreso actualizado: {:.0f}% completado.".format(project.percentComplete())
         )
         return False
+
+    def _on_estimated_hours_changed(self, task, page):
+        project = self.current_project
+        if project is None:
+            return
+        self._refresh_scheduled = False
+        self._pending_pages.clear()
+        self._pending_full = False
+        self.view.refresh_page(project, page)
+        self.hour_view.show_project(project)
+        try:
+            page_number = project.getPages().index(page) + 1
+        except ValueError:
+            page_number = "?"
+        self._set_status(
+            "Horas estimadas de \"{}\" (página {}) actualizadas: {} h.".format(
+                task.getTaskName(), page_number, task.getHoursPredicted()
+            )
+        )
 
     def _on_save_clicked(self, *args):
         project = self.current_project

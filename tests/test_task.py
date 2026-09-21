@@ -81,6 +81,45 @@ class TestTaskSetHoursCompleted(unittest.TestCase):
             task.setHoursCompleted(-1)
 
 
+class TestTaskSetEstimatedHours(unittest.TestCase):
+    def test_increase_keeps_completed(self):
+        task = Task("Boceto", 2)
+        task.setHoursCompleted(1)
+        task.setEstimatedHours(5)
+        self.assertEqual(task.getHoursPredicted(), 5)
+        self.assertEqual(task.getHoursCompleted(), 1)
+        self.assertEqual(task.getHoursLeft(), 4)
+        self.assertFalse(task.getCompletedTask())
+
+    def test_decrease_recomputes_left(self):
+        task = Task("Boceto", 5)
+        task.setHoursCompleted(2)
+        task.setEstimatedHours(3)
+        self.assertEqual(task.getHoursPredicted(), 3)
+        self.assertEqual(task.getHoursCompleted(), 2)
+        self.assertEqual(task.getHoursLeft(), 1)
+        self.assertFalse(task.getCompletedTask())
+
+    def test_decrease_below_completed_clamps(self):
+        task = Task("Boceto", 5)
+        task.setHoursCompleted(4)
+        task.setEstimatedHours(2)
+        self.assertEqual(task.getHoursPredicted(), 2)
+        self.assertEqual(task.getHoursCompleted(), 2)
+        self.assertEqual(task.getHoursLeft(), 0)
+        self.assertTrue(task.getCompletedTask())
+
+    def test_hours_a_tiny_minimum(self):
+        task = Task("Boceto", 2)
+        task.setEstimatedHours(1)
+        self.assertEqual(task.getHoursPredicted(), 1)
+
+    def test_zero_raises(self):
+        task = Task("Boceto", 2)
+        with self.assertRaises(ValueError):
+            task.setEstimatedHours(0)
+
+
 class TestTaskStr(unittest.TestCase):
     def test_str_returns_formatted_text(self):
         task = Task("Design", 20)
