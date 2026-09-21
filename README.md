@@ -2,6 +2,9 @@
 
 Una aplicación de escritorio para organizar y llevar el control de tus proyectos de cómic.
 
+![Alternative text](/2026-09-21_13-43.png "Screenshot")
+![Alternative text](/2026-09-21_13-45.png "Screenshot")
+
 ## Qué hace
 
 Fancy Projects te ayuda a gestionar todo el proceso creativo de un cómic en un solo lugar:
