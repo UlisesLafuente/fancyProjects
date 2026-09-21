@@ -15,7 +15,7 @@ WORKFLOW_LABELS = {
 
 
 WORKFLOW_DESCRIPTIONS = {
-    WorkflowType.CONTINUOUS: "Se hace la tarea de la página 1, luego su siguiente tarea,\ny así página a página.",
+    WorkflowType.CONTINUOUS: "Se hacen todas las tareas de cada página,\npor orden consecutivo.",
     WorkflowType.BY_TASK: "Primero se completan todas las tareas de un tipo\nsobre todas las páginas, y luego la siguiente tarea.",
 }
 
