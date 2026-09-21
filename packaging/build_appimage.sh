@@ -4,14 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="$(".venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT/src'); import src; print(src.__version__)")"
-ARCH="${ARCH:-x86_64}"
-APPIMAGE_TOOL="${APPIMAGE_TOOL:-build/appimagetool-x86_64.AppImage}"
-
 if [ ! -x ".venv/bin/python" ]; then
     echo "No hay .venv; creándolo con paquetes de sistema..."
     python3 -m venv --system-site-packages .venv
 fi
+
+VERSION="$(".venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT/src'); import src; print(src.__version__)")"
+ARCH="${ARCH:-x86_64}"
+APPIMAGE_TOOL="${APPIMAGE_TOOL:-build/appimagetool-x86_64.AppImage}"
+
 .venv/bin/python -m pip install --quiet --upgrade pyinstaller
 
 echo "==> PyInstaller (spec $PWD/packaging/fancyprojects.spec)"

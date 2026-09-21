@@ -4,19 +4,24 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="$("$ROOT/.venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT/src'); import src; print(src.__version__)")"
-echo "Versión: $VERSION"
-
 echo "==> Dependencias (Homebrew)"
-for pkg in gtk4 libadwaita pygobject3 adwaita-icon-theme; do
+for pkg in gtk4 libadwaita pygobject3 adwaita-icon-theme python; do
     brew list "$pkg" >/dev/null 2>&1 || brew install "$pkg"
 done
 
-echo "==> Entorno virtual"
+echo "==> Entorno virtual (usando el python de Homebrew)"
 if [ ! -x ".venv/bin/python" ]; then
-    python3 -m venv --system-site-packages .venv
+    if [ -x "$(brew --prefix)/bin/python3" ]; then
+        PYTHON_BIN="$(brew --prefix)/bin/python3"
+    else
+        PYTHON_BIN="python3"
+    fi
+    "$PYTHON_BIN" -m venv --system-site-packages .venv
 fi
 .venv/bin/python -m pip install --quiet --upgrade pyinstaller
+
+VERSION="$(".venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT/src'); import src; print(src.__version__)")"
+echo "Versión: $VERSION"
 
 echo "==> Icono .icns"
 ICONSET="build/icon.iconset"
@@ -56,7 +61,9 @@ ls -lh "dist/FancyProjects-${VERSION}-macos.dmg"
 
 echo "==> Smoke test"
 BIN="dist/Fancy Projects.app/Contents/MacOS/fancyprojects"
-"$BIN" &
+LOG="/tmp/fancyprojects-macos-smoke.log"
+rm -f "$LOG"
+"$BIN" >"$LOG" 2>&1 &
 PID=$!
 sleep 6
 if kill -0 "$PID" 2>/dev/null; then
@@ -65,6 +72,10 @@ if kill -0 "$PID" 2>/dev/null; then
     wait "$PID" 2>/dev/null || true
 else
     wait "$PID"
-    echo "App terminó antes de tiempo (exit=$?) -> FALLO"
+    CODE=$?
+    echo "App terminó antes de tiempo (exit=$CODE) -> FALLO"
+    echo "---- salida de la app ----"
+    sed -n '1,40p' "$LOG"
+    echo "--------------------------"
     exit 1
 fi

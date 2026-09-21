@@ -87,9 +87,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Instalar Homebrew + GTK
         run: |
-          brew install gtk4 libadwaita pygobject3 adwaita-icon-theme
-          python3 -m venv --system-site-packages .venv
-          .venv/bin/python -m pip install --upgrade pyinstaller
+          brew install gtk4 libadwaita pygobject3 adwaita-icon-theme python
       - name: Construir .app + dmg
         run: packaging/build_macos.sh
       - uses: actions/upload-artifact@v4
