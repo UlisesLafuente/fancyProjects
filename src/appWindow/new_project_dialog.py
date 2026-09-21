@@ -1,8 +1,9 @@
 import gi
 
-gi.require_version("Gtk", "3.0")
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
 
-from gi.repository import Gtk
+from gi.repository import Adw, Gtk
 
 from projects.Project import WorkflowType
 
@@ -13,147 +14,148 @@ WORKFLOW_LABELS = {
 }
 
 
-class NewProjectDialog(Gtk.Dialog):
-    def __init__(self, parent_window):
-        super().__init__(
-            title="Nuevo proyecto",
-            transient_for=parent_window,
-            modal=True,
-            resizable=False,
-        )
-        self.set_default_size(480, -1)
-        self.add_buttons("_Cancelar", Gtk.ResponseType.CANCEL, "_Crear", Gtk.ResponseType.OK)
-        self.set_default_response(Gtk.ResponseType.OK)
+WORKFLOW_DESCRIPTIONS = {
+    WorkflowType.CONTINUOUS: "Se hace la tarea de la página 1, luego su siguiente tarea,\ny así página a página.",
+    WorkflowType.BY_TASK: "Primero se completan todas las tareas de un tipo\nsobre todas las páginas, y luego la siguiente tarea.",
+}
 
+
+class NewProjectDialog(Adw.Dialog):
+    def __init__(self, on_create=None):
+        super().__init__()
+        self.set_title("Nuevo proyecto")
+        self.set_size_request(480, -1)
+        self._create_callback = on_create
         self._tasks = []
 
-        content = self.get_content_area()
-        content.set_border_width(18)
-        content.set_spacing(14)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_margin_top(18)
+        box.set_margin_bottom(18)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
 
-        grid = Gtk.Grid()
-        grid.set_row_spacing(10)
-        grid.set_column_spacing(12)
-        content.add(grid)
+        group = Adw.PreferencesGroup(title="Datos del proyecto")
 
-        # Nombre
-        name_label = Gtk.Label(label="Nombre", xalign=0.0)
-        name_label.get_style_context().add_class("dim-label")
-        self.entry_name = Gtk.Entry()
-        self.entry_name.set_placeholder_text("P. ej. Comic de superheroes")
-        grid.attach(name_label, 0, 0, 1, 1)
-        grid.attach(self.entry_name, 1, 0, 1, 1)
+        self.entry_name = Adw.EntryRow(title="Nombre")
+        group.add(self.entry_name)
 
-        # Número de páginas
-        pages_label = Gtk.Label(label="Páginas", xalign=0.0)
-        pages_label.get_style_context().add_class("dim-label")
-        self.spin_pages = Gtk.SpinButton()
-        self.spin_pages.set_range(1, 10000)
-        self.spin_pages.set_increments(1, 5)
+        self.spin_pages = Adw.SpinRow.new_with_range(1, 10000, 1)
+        self.spin_pages.set_title("Páginas")
         self.spin_pages.set_value(1)
-        grid.attach(pages_label, 0, 1, 1, 1)
-        grid.attach(self.spin_pages, 1, 1, 1, 1)
+        group.add(self.spin_pages)
 
-        # Tareas
-        tasks_label = Gtk.Label(label="Tareas", xalign=0.0)
-        tasks_label.get_style_context().add_class("dim-label")
-        grid.attach(tasks_label, 0, 2, 1, 1)
+        box.append(group)
 
-        tasks_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        tasks_heading = Gtk.Label(label="Tareas", xalign=0.0)
+        tasks_heading.add_css_class("heading")
+        tasks_heading.set_margin_top(10)
+        box.append(tasks_heading)
+
         self.tasks_box = Gtk.ListBox()
         self.tasks_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.tasks_box.set_size_request(-1, 120)
-        tasks_vbox.pack_start(self.tasks_box, True, True, 0)
+        self.tasks_box.add_css_class("boxed-list")
+        box.append(self.tasks_box)
 
         add_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.entry_task = Gtk.Entry()
-        self.entry_task.set_placeholder_text("Nombre de la tarea (p. ej. Boceto)")
         self.entry_task.set_hexpand(True)
+        add_btn = Gtk.Button(label="Añadir")
+        add_btn.add_css_class("suggested-action")
         self.entry_task.connect("activate", self._on_add_task)
-        add_btn = Gtk.Button.new_with_label("Añadir")
         add_btn.connect("clicked", self._on_add_task)
-        add_row.pack_start(self.entry_task, True, True, 0)
-        add_row.pack_start(add_btn, False, False, 0)
-        tasks_vbox.pack_start(add_row, False, False, 0)
-        grid.attach(tasks_vbox, 1, 2, 1, 1)
+        add_row.append(self.entry_task)
+        add_row.append(add_btn)
+        add_row.set_margin_top(6)
+        box.append(add_row)
 
-        # Workflow
-        workflow_label = Gtk.Label(label="Workflow", xalign=0.0)
-        workflow_label.get_style_context().add_class("dim-label")
-        grid.attach(workflow_label, 0, 3, 1, 1)
-
-        workflow_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        self.radio_continuous = Gtk.RadioButton.new_with_label_from_widget(
-            None, WORKFLOW_LABELS[WorkflowType.CONTINUOUS]
-        )
+        workflow_group = Adw.PreferencesGroup(title="Workflow")
+        self.radio_continuous = Gtk.CheckButton()
         self.radio_continuous.set_active(True)
-        desc_continuous = Gtk.Label(label="Se hace la tarea de la página 1, luego su siguiente tarea,\ny así página a página.", xalign=0.0)
-        desc_continuous.get_style_context().add_class("dim-label")
-        self.radio_by_task = Gtk.RadioButton.new_with_label_from_widget(
-            self.radio_continuous, WORKFLOW_LABELS[WorkflowType.BY_TASK]
-        )
-        desc_by_task = Gtk.Label(label="Primero se completan todas las tareas de un tipo\nsobre todas las páginas, y luego la siguiente tarea.", xalign=0.0)
-        desc_by_task.get_style_context().add_class("dim-label")
+        self.radio_by_task = Gtk.CheckButton(group=self.radio_continuous)
 
-        workflow_vbox.pack_start(self.radio_continuous, False, False, 0)
-        workflow_vbox.pack_start(desc_continuous, False, False, 0)
-        workflow_vbox.pack_start(self.radio_by_task, False, False, 0)
-        workflow_vbox.pack_start(desc_by_task, False, False, 0)
-        grid.attach(workflow_vbox, 1, 3, 1, 1)
+        self._append_workflow_option(
+            workflow_group, self.radio_continuous,
+            WORKFLOW_LABELS[WorkflowType.CONTINUOUS],
+            WORKFLOW_DESCRIPTIONS[WorkflowType.CONTINUOUS],
+        )
+        self._append_workflow_option(
+            workflow_group, self.radio_by_task,
+            WORKFLOW_LABELS[WorkflowType.BY_TASK],
+            WORKFLOW_DESCRIPTIONS[WorkflowType.BY_TASK],
+        )
+        box.append(workflow_group)
 
         self.error_label = Gtk.Label(label="", xalign=0.0)
-        self.error_label.get_style_context().add_class("error")
+        self.error_label.add_css_class("error")
         self.error_label.set_visible(False)
-        content.pack_end(self.error_label, False, False, 0)
+        box.append(self.error_label)
 
-        self.connect("response", self._on_response)
+        action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        action_box.set_halign(Gtk.Align.END)
+        cancel_btn = Gtk.Button(label="Cancelar")
+        cancel_btn.connect("clicked", self._on_cancel)
+        create_btn = Gtk.Button(label="Crear")
+        create_btn.add_css_class("suggested-action")
+        create_btn.connect("clicked", self._on_create)
+        action_box.append(cancel_btn)
+        action_box.append(create_btn)
+        box.append(action_box)
 
-        self.show_all()
-        self.entry_name.grab_focus()
+        self.set_child(box)
+
+    @staticmethod
+    def _append_workflow_option(group, checkbutton, title, description):
+        row = Adw.ActionRow(title=title, subtitle=description)
+        row.set_activatable_widget(checkbutton)
+        row.add_suffix(checkbutton)
+        group.add(row)
+
+    def _on_cancel(self, *args):
+        self.close()
+
+    def _on_create(self, *args):
+        if not self._is_valid():
+            self.error_label.set_text(self._error_message())
+            self.error_label.set_visible(True)
+            return
+        if self._create_callback is not None:
+            self._create_callback(self.get_data())
+        self.close()
 
     def _on_add_task(self, *args):
         name = self.entry_task.get_text().strip()
         if name and name not in self._tasks:
             self._tasks.append(name)
             self._add_task_row(name)
+            self.error_label.set_visible(False)
         self.entry_task.set_text("")
         self.entry_task.grab_focus()
 
     def _add_task_row(self, name):
         row = Gtk.ListBoxRow()
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        box.set_margin_start(8)
-        box.set_margin_end(8)
-        box.set_margin_top(4)
-        box.set_margin_bottom(4)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+        box.set_margin_top(6)
+        box.set_margin_bottom(6)
 
         label = Gtk.Label(label=name, xalign=0.0)
         label.set_hexpand(True)
-        remove_btn = Gtk.Button.new_from_icon_name(
-            "list-remove-symbolic", Gtk.IconSize.BUTTON
-        )
-        remove_btn.set_relief(Gtk.ReliefStyle.NONE)
+        remove_btn = Gtk.Button()
+        remove_btn.set_child(Gtk.Image.new_from_icon_name("list-remove-symbolic"))
+        remove_btn.add_css_class("flat")
         remove_btn.set_tooltip_text("Eliminar tarea")
         remove_btn.connect("clicked", self._on_remove_task, name, row)
 
-        box.pack_start(label, True, True, 0)
-        box.pack_start(remove_btn, False, False, 0)
-        row.add(box)
-        self.tasks_box.add(row)
-        self.tasks_box.show_all()
+        box.append(label)
+        box.append(remove_btn)
+        row.set_child(box)
+        self.tasks_box.append(row)
 
     def _on_remove_task(self, button, name, row):
         if name in self._tasks:
             self._tasks.remove(name)
         self.tasks_box.remove(row)
-
-    def _on_response(self, dialog, response_id):
-        if response_id != Gtk.ResponseType.OK:
-            return
-        if not self._is_valid():
-            self.error_label.set_text(self._error_message())
-            self.error_label.show()
-            dialog.stop_emission("response")
 
     def _is_valid(self):
         return bool(self.entry_name.get_text().strip()) and bool(self._tasks)

@@ -1,0 +1,30 @@
+window.background {
+    border-radius: 14px;
+}
+
+button,
+entry,
+spinbutton,
+row,
+box.card,
+list,
+textview view {
+    border-radius: 10px;
+}
+
+entry {
+    border-radius: 8px;
+}
+
+listbox row {
+    border-radius: 8px;
+}
+
+row:hover {
+    background-color: alpha(currentColor, 0.06);
+}
+
+.workflow-badge {
+    border-radius: 999px;
+    padding: 2px 10px;
+}

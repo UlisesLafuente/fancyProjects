@@ -1,13 +1,20 @@
 import gi
 
-gi.require_version("Gtk", "3.0")
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
 
-from gi.repository import Gtk
+from gi.repository import Gio, GObject, Gtk, Pango
 
-WORKFLOW_LABELS = {
-    "continuous": "Workflow continuo",
-    "by_task": "Workflow por tareas",
-}
+from appWindow.new_project_dialog import WORKFLOW_LABELS
+
+
+class RowItem(GObject.Object):
+    def __init__(self, element="", hours="", state="", bold=False):
+        super().__init__()
+        self.element = element
+        self.hours = hours
+        self.state = state
+        self.bold = bold
 
 
 class ProjectView(Gtk.Stack):
@@ -26,19 +33,19 @@ class ProjectView(Gtk.Stack):
         box.set_valign(Gtk.Align.CENTER)
         box.set_halign(Gtk.Align.CENTER)
 
-        icon = Gtk.Image.new_from_icon_name("folder-documents-symbolic", Gtk.IconSize.DIALOG)
+        icon = Gtk.Image.new_from_icon_name("folder-documents-symbolic")
         icon.set_pixel_size(64)
         icon.set_opacity(0.4)
 
         title = Gtk.Label(label="No hay ningún proyecto abierto")
-        title.get_style_context().add_class("dim-label")
+        title.add_css_class("dim-label")
 
         hint = Gtk.Label(label="Usa File ▸ Nuevo proyecto para crear uno,\no File ▸ Abrir para cargar uno guardado.")
-        hint.get_style_context().add_class("dim-label")
+        hint.add_css_class("dim-label")
 
-        box.pack_start(icon, False, False, 0)
-        box.pack_start(title, False, False, 0)
-        box.pack_start(hint, False, False, 0)
+        box.append(icon)
+        box.append(title)
+        box.append(hint)
         return box
 
     def _build_project_page(self):
@@ -50,48 +57,61 @@ class ProjectView(Gtk.Stack):
 
         self.header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.project_title = Gtk.Label(label="", xalign=0.0)
-        self.project_title.get_style_context().add_class("title-1")
+        self.project_title.add_css_class("title-1")
         self.workflow_label = Gtk.Label(label="", xalign=0.0)
-        self.workflow_label.get_style_context().add_class("dim-label")
+        self.workflow_label.add_css_class("dim-label")
         self.summary_label = Gtk.Label(label="", xalign=0.0)
-        self.summary_label.get_style_context().add_class("dim-label")
+        self.summary_label.add_css_class("dim-label")
 
-        self.header_box.pack_start(self.project_title, False, False, 0)
-        self.header_box.pack_start(self.workflow_label, False, False, 0)
-        self.header_box.pack_start(self.summary_label, False, False, 0)
-        page.pack_start(self.header_box, False, False, 0)
+        self.header_box.append(self.project_title)
+        self.header_box.append(self.workflow_label)
+        self.header_box.append(self.summary_label)
+        page.append(self.header_box)
+
+        self.store = Gio.ListStore.new(RowItem)
+        model = Gtk.SingleSelection.new(self.store)
+        self.column_view = Gtk.ColumnView(model=model)
+        self.column_view.set_vexpand(True)
+        self.column_view.set_hexpand(True)
+
+        self._append_column("Elemento", lambda row: row.element, 0)
+        self._append_column("Horas", lambda row: row.hours, 160)
+        self._append_column("Estado", lambda row: row.state, 160)
 
         scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled.set_vexpand(True)
-
-        self.tree = Gtk.TreeView()
-        self.tree.set_headers_visible(False)
-        self.store = Gtk.TreeStore(str, str, str)
-        self.tree.set_model(self.store)
-
-        column = Gtk.TreeViewColumn()
-        cell = Gtk.CellRendererText()
-        cell.set_property("weight", 700)
-        column.pack_start(cell, False)
-        column.add_attribute(cell, "text", 0)
-        self.tree.append_column(column)
-
-        hours_col = Gtk.TreeViewColumn(title="Horas")
-        hours_cell = Gtk.CellRendererText()
-        hours_col.pack_start(hours_cell, False)
-        hours_col.add_attribute(hours_cell, "text", 1)
-        self.tree.append_column(hours_col)
-
-        state_col = Gtk.TreeViewColumn(title="Estado")
-        state_cell = Gtk.CellRendererText()
-        state_col.pack_start(state_cell, False)
-        state_col.add_attribute(state_cell, "text", 2)
-        self.tree.append_column(state_col)
-
-        scrolled.add(self.tree)
-        page.pack_start(scrolled, True, True, 0)
+        scrolled.set_child(self.column_view)
+        page.append(scrolled)
         return page
+
+    def _append_column(self, title, getter, width):
+        column = Gtk.ColumnViewColumn(title=title)
+        if width:
+            column.set_fixed_width(width)
+        factory = Gtk.SignalListItemFactory()
+        factory.connect("setup", self._factory_setup)
+        factory.connect("bind", lambda factory, list_item: self._factory_bind(factory, list_item, getter))
+        column.set_factory(factory)
+        self.column_view.append_column(column)
+
+    @staticmethod
+    def _factory_setup(factory, list_item):
+        label = Gtk.Label(label="", xalign=0.0)
+        label.set_margin_start(12)
+        label.set_margin_end(12)
+        list_item.set_child(label)
+
+    @staticmethod
+    def _factory_bind(factory, list_item, getter):
+        label = list_item.get_child()
+        row = list_item.get_item()
+        label.set_text(getter(row))
+        if row.bold:
+            attributes = Pango.AttrList()
+            attributes.insert(Pango.attr_weight_new(Pango.Weight.BOLD))
+            label.set_attributes(attributes)
+        else:
+            label.set_attributes(None)
 
     def show_empty(self):
         self.set_visible_child_name("empty")
@@ -109,21 +129,19 @@ class ProjectView(Gtk.Stack):
             )
         )
 
-        self.store.clear()
+        self.store.remove_all()
         for page_index, page in enumerate(project.getPages(), start=1):
-            page_name = "Página {}".format(page_index)
-            page_iter = self.store.append(
-                None,
-                (page_name, "{:.0f} h".format(page.getTotalEstimatedHours()), ""),
-            )
+            self.store.append(RowItem(
+                element="Página {}".format(page_index),
+                hours="{:.0f} h".format(page.getTotalEstimatedHours()),
+                state="",
+                bold=True,
+            ))
             for task in page.getTasks():
                 state = "Completada" if task.getCompletedTask() else "Pendiente"
-                self.store.append(
-                    page_iter,
-                    (
-                        "  " + task.getTaskName(),
-                        "{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted()),
-                        state,
-                    ),
-                )
-        self.tree.expand_all()
+                self.store.append(RowItem(
+                    element="  " + task.getTaskName(),
+                    hours="{:.0f} / {:.0f} h".format(task.getHoursCompleted(), task.getHoursPredicted()),
+                    state=state,
+                    bold=False,
+                ))
