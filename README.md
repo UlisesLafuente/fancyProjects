@@ -55,6 +55,9 @@ Tienes dos opciones:
 - **macOS**: arrastra la aplicación a la papelera.
 - **Windows**: usa *Agregar o quitar programas* del panel de control.
 
+### Declaración de uso de LLMs
+La aplicación no hace uso de tecnología LLM en ninguno de sus procesos, ni tampoco recibe ni envía datos por red. Sin embargo, en el desarrollo se han utilizado agentes para asistir en el código del interface, no así en la lógica de negocio ni en la programación de la base de datos.
+
 ## Licencia
 
 Distribuido bajo la **GNU General Public License versión 3**. Consulta el archivo `LICENSE` para más detalles.
